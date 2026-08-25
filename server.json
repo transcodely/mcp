@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.transcodely/mcp",
+  "description": "Transcode and host video from one prompt; get a playable link back. Agent-native, over MCP.",
+  "title": "Transcodely",
+  "version": "1.0.0",
+  "websiteUrl": "https://www.transcodely.com/mcp",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.transcodely.com/mcp"
+    }
+  ],
+  "icons": [
+    {
+      "src": "https://www.transcodely.com/web-app-manifest-192x192.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "192x192"
+      ]
+    }
+  ]
+}
