@@ -19,5 +19,9 @@
         "192x192"
       ]
     }
-  ]
+  ],
+  "repository": {
+    "url": "https://github.com/transcodely/mcp",
+    "source": "github"
+  }
 }
