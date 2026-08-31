@@ -58,6 +58,27 @@ Nothing on this surface deletes or modifies existing data: four tools only read,
 3. *"What's the status of my last job?"*
 4. *"How much have I spent on video this month, and which day cost the most?"*
 
+## Run locally (stdio bridge)
+
+Remote-capable clients should connect straight to the hosted endpoint above — that's the
+one-click OAuth path. For stdio-only clients, sandboxes, and headless use, this repo is
+also a runnable bridge that serves the same 7 tools over stdio and forwards calls to the
+hosted server:
+
+```bash
+# with an API key (create one in the Transcodely dashboard):
+TRANSCODELY_API_KEY=ak_... npx github:transcodely/mcp
+
+# or via Docker:
+docker build -t transcodely-mcp .
+docker run -i --rm -e TRANSCODELY_API_KEY=ak_... transcodely-mcp
+```
+
+Without `TRANSCODELY_API_KEY` the bridge still starts and answers introspection
+(`initialize`, `tools/list`); tool calls return an error pointing at the two auth paths.
+`tools.json` is generated from the hosted server's own `tools/list` response and is
+re-vendored on every server release that changes the tool surface.
+
 ## Auth and guardrails
 
 - OAuth 2.1 with PKCE via browser consent; the server implements RFC 9728 Protected Resource Metadata and RFC 8707 resource indicators.

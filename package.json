@@ -1,0 +1,13 @@
+{
+  "name": "transcodely-mcp-bridge",
+  "version": "1.0.0",
+  "description": "Local stdio bridge for the hosted Transcodely MCP server — video transcoding and hosting for AI agents",
+  "type": "module",
+  "bin": { "transcodely-mcp": "src/index.mjs" },
+  "main": "src/index.mjs",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

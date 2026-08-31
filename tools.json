@@ -1,0 +1,916 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "title": "Create transcoding job"
+    },
+    "description": "Create a transcoding job. Reads a source video from a URL (gs://, s3://, or https://) and produces one or more output renditions. Outputs are written to a storage origin you own (pass output_origin_id); to produce a hosted, playable video instead, use create_video_from_url. Returns the job id, status, and a per-output pricing/status summary. Validation (codec x container compatibility, limits, required fields) is performed server-side and surfaced as a machine-readable error.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "input_url": {
+          "description": "Source video to transcode. Supported schemes: gs:// (Google Cloud Storage), s3:// (S3-compatible), https://.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Arbitrary string key/value pairs echoed back on the job.",
+          "type": "object"
+        },
+        "output_origin_id": {
+          "description": "Storage origin (ori_...) to write outputs to. Required unless the job targets managed hosting; a job without it is rejected with output_origin_id required.",
+          "type": "string"
+        },
+        "outputs": {
+          "description": "Output renditions to produce (1-10).",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "description": "Container or packaging format: mp4, webm, mkv, mov, hls, dash, or adaptive.",
+                "type": "string"
+              },
+              "path": {
+                "description": "Output path template override for this rendition (e.g. \"{job_id}/{output_id}/video.mp4\").",
+                "type": "string"
+              },
+              "preset": {
+                "description": "Preset applied to this output as a base (id like pst_xxx or slug). Overrides the job-level preset; the fields above override the preset.",
+                "type": "string"
+              },
+              "quality_tier": {
+                "description": "Quality tier: economy, standard (default), or premium. Higher tiers cost more.",
+                "type": "string"
+              },
+              "resolution": {
+                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution or inherit from a preset.",
+                "type": "string"
+              },
+              "video_codec": {
+                "description": "Video codec: h264 (default), h265, vp9, or av1. Must be compatible with the chosen format.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "format"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "preset": {
+          "description": "Preset applied to every output as a base (id like pst_xxx or slug like gaming_1080p_60_standard). Per-output fields override it.",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Scheduling priority: economy, standard (default), or premium. Does not affect cost.",
+          "type": "string"
+        },
+        "webhook_url": {
+          "description": "HTTPS endpoint to receive job lifecycle webhook events (job.completed, job.failed, ...).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input_url",
+        "outputs"
+      ],
+      "type": "object"
+    },
+    "name": "create_job",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "outputs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "estimated_cost": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "format": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "format"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "total_estimated_cost": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "video_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "status",
+        "currency",
+        "outputs",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "title": "Ingest and host video"
+    },
+    "description": "Ingest a remote https:// video and host it in one call — this is the tool for \"transcode and host this, give me a link\". Downloads the URL, transcodes it into an adaptive streaming ladder, and returns a hosted video (vid_...) with status \"processing\". The URL must be publicly reachable over http(s); private/internal targets are rejected (SSRF protection). Visibility follows the app's hosting default, \"unlisted\" when the app has not set one (playable by anyone with the link, not listed publicly). Enables managed hosting for the app on first use — a one-way change, after which hosted storage and egress bill at the standard rates. To finish the job: poll get_video with the returned id every ~10s until status is \"ready\" (typically under a few minutes for a short clip), then give the user playback.player_url — that is the durable, clickable link.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Longer description for the hosted video.",
+          "type": "string"
+        },
+        "preset": {
+          "description": "Preset (id like pst_xxx or slug) driving the transcode. Omit to use the app's default adaptive ladder.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Freeform tags to attach to the video.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "title": {
+          "description": "Display title for the hosted video.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Publicly reachable https:// source video to ingest. Private/internal hosts are rejected (SSRF protection).",
+          "type": "string"
+        },
+        "visibility": {
+          "description": "Access level: public, unlisted, or private. Omit to use the app's hosting default visibility (unlisted if the app has not set one).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "name": "create_video_from_url",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "duration_seconds": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "encoding_cost": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object": {
+          "type": "string"
+        },
+        "output_storage_prefix": {
+          "type": "string"
+        },
+        "playback": {
+          "additionalProperties": false,
+          "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
+          "properties": {
+            "expires_at": {
+              "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
+              "type": "string"
+            },
+            "hls_url": {
+              "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
+              "type": "string"
+            },
+            "player_url": {
+              "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
+              "type": "string"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "poster_url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "ready_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "renditions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bitrate_kbps": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "type": "string"
+              },
+              "height": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "resolution": {
+                "type": "string"
+              },
+              "size_bytes": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "width": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "resolution",
+              "codec"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "visibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "status",
+        "visibility",
+        "renditions",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "title": "Generate AI captions"
+    },
+    "description": "Generate AI captions (subtitles) for a hosted video by id (vid_...). Creates a billable captions job: speech is transcribed into a WebVTT subtitle track in the given language (default \"auto\" to detect the spoken language), attached to the video when the job completes. Billed per source minute; the fee is only charged when a caption track is actually delivered. Idempotent per video+language: repeating the call returns the existing job instead of creating and billing a new one.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "description": "ISO 639-2 language code for the captions (e.g. eng, spa, bul). Defaults to \"auto\" to detect the spoken language.",
+          "type": "string"
+        },
+        "video_id": {
+          "description": "Hosted video id to caption (vid_...).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "video_id"
+      ],
+      "type": "object"
+    },
+    "name": "generate_captions",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "video_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get job status"
+    },
+    "description": "Get a concise status snapshot for a transcoding job by id (job_...): overall status and progress, any error code/message, and per-output status/progress with errors. Lighter than the full job record — use it to poll a job to completion.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Job id to inspect (job_...).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_job_status",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "completed_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "error_message": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "outputs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "error_code": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "error_message": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "progress": {
+          "type": "integer"
+        },
+        "started_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "progress",
+        "outputs",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get usage and cost"
+    },
+    "description": "Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. Defaults to the current month; pass month as \"YYYY-MM\" for a specific period.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "month": {
+          "description": "Billing month as \"YYYY-MM\" (e.g. 2026-07). Defaults to the current UTC month.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_usage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "billing_month": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "daily": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "date": {
+                "type": "string"
+              },
+              "egress_bytes": {
+                "type": "integer"
+              },
+              "encoding_cost": {
+                "type": "number"
+              },
+              "request_count": {
+                "type": "integer"
+              },
+              "storage_bytes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "date",
+              "storage_bytes",
+              "egress_bytes",
+              "request_count",
+              "encoding_cost"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "egress_cost": {
+          "type": "number"
+        },
+        "egress_gb": {
+          "type": "number"
+        },
+        "encoding_cost": {
+          "type": "number"
+        },
+        "encoding_minutes": {
+          "type": "number"
+        },
+        "storage_cost": {
+          "type": "number"
+        },
+        "storage_gb_avg": {
+          "type": "number"
+        },
+        "total_cost": {
+          "type": "number"
+        },
+        "total_requests": {
+          "type": "integer"
+        },
+        "videos_encoded": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "videos_hosted": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "billing_month",
+        "currency",
+        "videos_encoded",
+        "encoding_minutes",
+        "encoding_cost",
+        "storage_gb_avg",
+        "storage_cost",
+        "videos_hosted",
+        "egress_gb",
+        "egress_cost",
+        "total_requests",
+        "total_cost",
+        "daily"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get video"
+    },
+    "description": "Fetch a hosted video by id (vid_...): status, visibility, title, duration, poster image, encoded renditions (resolution, codec, bitrate, dimensions), and — once status is \"ready\" — a playback block. Poll this until status is \"ready\" (statuses: uploading, processing, ready, error); no playback block is present before then. playback.player_url is the durable player page to hand a human, and is issued for public and unlisted videos only — private videos are not served by the player page and get playback.hls_url instead, a signed manifest for your own player that stops working at playback.expires_at (re-fetch with get_video rather than storing it).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Hosted video id to fetch (vid_...).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_video",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "duration_seconds": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "encoding_cost": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object": {
+          "type": "string"
+        },
+        "output_storage_prefix": {
+          "type": "string"
+        },
+        "playback": {
+          "additionalProperties": false,
+          "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
+          "properties": {
+            "expires_at": {
+              "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
+              "type": "string"
+            },
+            "hls_url": {
+              "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
+              "type": "string"
+            },
+            "player_url": {
+              "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
+              "type": "string"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "poster_url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "ready_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "renditions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bitrate_kbps": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "type": "string"
+              },
+              "height": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "resolution": {
+                "type": "string"
+              },
+              "size_bytes": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "width": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "resolution",
+              "codec"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "visibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "status",
+        "visibility",
+        "renditions",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "List jobs"
+    },
+    "description": "List transcoding jobs for the authenticated app, newest first. Optionally filter by status. Returns compact rows (id, status, progress, input_url, cost, timestamps) plus next_cursor for pagination; pass it back as cursor to fetch the next page.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "description": "Pagination cursor from a previous response's next_cursor. Omit for the first page.",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum jobs to return (1-100). Defaults to 20.",
+          "type": "integer"
+        },
+        "status": {
+          "description": "Filter by job status: pending, probing, processing, completed, failed, canceled, partial, or awaiting_confirmation. Omit for all statuses.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_jobs",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "jobs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "input_url": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              },
+              "total_actual_cost": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "total_estimated_cost": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress",
+              "input_url",
+              "priority",
+              "currency",
+              "created_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next_cursor": {
+          "type": "string"
+        },
+        "total_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "jobs",
+        "total_count"
+      ],
+      "type": "object"
+    }
+  }
+]
