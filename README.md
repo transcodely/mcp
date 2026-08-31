@@ -3,6 +3,7 @@
 **Video transcoding and hosting for AI agents, over the [Model Context Protocol](https://modelcontextprotocol.io).**
 
 [![smithery badge](https://smithery.ai/badge/transcodely/video)](https://smithery.ai/servers/transcodely/video)
+[![transcodely/mcp MCP server](https://glama.ai/mcp/servers/transcodely/mcp/badges/score.svg)](https://glama.ai/mcp/servers/transcodely/mcp)
 
 Transcodely is agent-native video infrastructure: transcode, host, and get a playable link back from one natural-language prompt. Connect with one OAuth click — no API key to create or paste — then hand your agent a video URL.
 
