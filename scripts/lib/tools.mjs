@@ -37,6 +37,35 @@ export function readPin() {
 }
 
 /**
+ * The tools that put a charge on your bill, by name.
+ *
+ * This list is WRITTEN, not derived, and that is deliberate. MCP annotations
+ * carry no billing dimension: `readOnlyHint` and `destructiveHint` describe
+ * what a call does to your data, never what it costs. Reading "not read-only"
+ * as "billed" published `create_preset` as billable on four public surfaces,
+ * which is false — saving a preset writes a config row and nothing else.
+ *
+ * Verified against the api's charge path: each of these three reaches
+ * `Jobs.Create` (`internal/mcpserver/tools_jobs.go:92`,
+ * `tools_videos.go:75` via `Videos.CreateFromUrl`, and `tools_videos.go:216`).
+ * `internal/services/presets/` has no ledger, charge or invoice reference —
+ * only a cost ESTIMATOR that computes a display figure for a future job.
+ *
+ * `assertBillableAreWrites` holds it to the export; `test/vendored.mjs` holds
+ * every public surface to it.
+ */
+export const BILLABLE = new Set([
+	"create_job",
+	"create_video_from_url",
+	"generate_captions",
+]);
+
+/** Whether calling this tool costs money. Never inferred from annotations. */
+export function isBillable(tool) {
+	return BILLABLE.has(typeof tool === "string" ? tool : tool.name);
+}
+
+/**
  * What a tool does to your account, derived from its MCP annotations only.
  *
  * `overwrite` is the protocol's `destructiveHint`, which means "not additive" —
@@ -55,7 +84,25 @@ export function effectOf(tool) {
 export function toolCounts(tools = readTools()) {
 	const counts = { read: 0, create: 0, overwrite: 0 };
 	for (const tool of tools) counts[effectOf(tool)] += 1;
-	return { total: tools.length, ...counts };
+	return { total: tools.length, ...counts, billable: tools.filter(isBillable).length };
+}
+
+/**
+ * Every billable tool must exist and must write; a read-only tool that bills
+ * would be a contradiction, and a name that no longer exists would silently
+ * shrink the list. Throws naming the offender.
+ */
+export function assertBillableAreWrites(tools = readTools()) {
+	const byName = new Map(tools.map((t) => [t.name, t]));
+	for (const name of BILLABLE) {
+		const tool = byName.get(name);
+		if (!tool) {
+			throw new Error(`BILLABLE names ${name}, which the export does not carry`);
+		}
+		if (effectOf(tool) === "read") {
+			throw new Error(`BILLABLE names ${name}, which the export marks read-only`);
+		}
+	}
 }
 
 /**

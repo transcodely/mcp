@@ -47,11 +47,24 @@ function resolveCheckout() {
 	}
 
 	const dir = mkdtempSync(join(tmpdir(), "transcodely-api-"));
-	const url = pin.repository.replace("https://", `https://x-access-token:${token}@`);
 	console.log(`cloning ${pin.repository} at ${pin.ref}`);
+	// The token goes in a header, not in the URL: a URL-embedded credential
+	// lands on argv, in `git remote -v` inside the clone, and in any error
+	// message that echoes the remote.
+	const auth = Buffer.from(`x-access-token:${token}`).toString("base64");
 	// A missing ref must fail loudly: a pin that names a tag nobody cut is the
 	// exact mistake this file exists to catch.
-	run("git", ["clone", "--depth", "1", "--branch", pin.ref, url, dir]);
+	run("git", [
+		"-c",
+		`http.extraheader=AUTHORIZATION: basic ${auth}`,
+		"clone",
+		"--depth",
+		"1",
+		"--branch",
+		pin.ref,
+		pin.repository,
+		dir,
+	]);
 	return { dir, temporary: true };
 }
 

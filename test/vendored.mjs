@@ -10,11 +10,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+	BILLABLE,
 	README_PATH,
 	ROOT,
 	SERVER_JSON_PATH,
+	assertBillableAreWrites,
 	assertNothingDeletes,
 	effectOf,
+	isBillable,
 	numberWord,
 	readExport,
 	readPin,
@@ -57,6 +60,39 @@ assert.deepEqual(
 
 // The promise on the front of the README, re-derived rather than trusted.
 assertNothingDeletes(tools);
+assertBillableAreWrites(tools);
+
+// --- billing claims ----------------------------------------------------------
+
+// MCP annotations carry no billing dimension, so `BILLABLE` is a written list.
+// A written list can go stale, and the way it goes stale is a new free write
+// tool inheriting a "billable" label from the row above it. Nothing here may
+// mention a non-billable tool on the same line as a charge.
+const CHARGE_WORDS = /billable|billed|bills you|costs money|charged/i;
+for (const tool of tools) {
+	if (isBillable(tool)) continue;
+	for (const [label, text] of [
+		["README.md", readme],
+		["server.json description", serverJson.description],
+	]) {
+		for (const line of text.split("\n")) {
+			assert.ok(
+				!(line.includes(tool.name) && CHARGE_WORDS.test(line)),
+				`${label} calls ${tool.name} billable, but it is not in BILLABLE. ` +
+					`Either it really does charge (add it, and say why) or the label is wrong:\n  ${line.trim()}`,
+			);
+		}
+	}
+}
+
+// And the converse: every tool we DO charge for must be named somewhere with
+// its charge, so the README cannot quietly stop warning about one.
+for (const name of BILLABLE) {
+	assert.ok(
+		readme.split("\n").some((line) => line.includes(name) && CHARGE_WORDS.test(line)),
+		`README never marks ${name} as billable, but it is`,
+	);
+}
 
 // --- counts stated in prose --------------------------------------------------
 
@@ -64,6 +100,14 @@ assertNothingDeletes(tools);
 // move together. Here we hold the two that live in this repo.
 const NUMERAL = "\\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty";
 const phrase = new RegExp(`\\b(${NUMERAL}) tools\\b`, "gi");
+
+// Every count the prose may legitimately quote: the whole surface, or one of
+// the groups the export defines. Anything else is a stale claim.
+const legitimate = new Set(
+	[counts.total, counts.read, counts.create, counts.overwrite, counts.billable]
+		.flatMap((n) => [String(n), numberWord(n)]),
+);
+
 for (const [label, text] of [
 	["README.md", readme],
 	["server.json description", serverJson.description],
@@ -71,27 +115,39 @@ for (const [label, text] of [
 	const said = [...text.matchAll(phrase)].map((m) => m[1].toLowerCase());
 	assert.ok(said.length > 0, `${label} never states the tool count`);
 	for (const word of said) {
-		assert.equal(
-			word,
-			numberWord(counts.total),
-			`${label} says "${word} tools" but the export carries ${counts.total}`,
+		assert.ok(
+			legitimate.has(word),
+			`${label} says "${word} tools", which is no group the export has`,
 		);
 	}
 }
 
-const readOnlyClaim = new RegExp(`\\b(${NUMERAL}) read-only\\b`, "gi");
-for (const match of readme.matchAll(readOnlyClaim)) {
+// The total itself must actually appear somewhere, or the check above passes
+// on a file that only ever quotes sub-counts.
+assert.ok(
+	[...readme.matchAll(phrase)].some((m) => m[1].toLowerCase() === numberWord(counts.total)),
+	`README.md never states the real total of ${counts.total} tools`,
+);
+
+// The per-line check above only sees claims that NAME a tool. The claim that
+// actually shipped wrong was an aggregate — "four start work you are billed
+// for" — which names nothing. So a numeral reaching a charge word within one
+// clause (no sentence break, dash, newline or table pipe between them) must be
+// the billable count, not the create count.
+// The inner class excludes a further numeral, so the match is the numeral
+// NEAREST the charge word — otherwise "nine only read, four start work you are
+// billed for" is reported against "nine", which is not the claim at fault.
+const CHARGE_COUNT = new RegExp(
+	`\\b(${NUMERAL})\\b(?:(?!\\b(?:${NUMERAL})\\b)[^.\\n\u2014|]){0,45}?`
+		+ "(?:billable|billed|charged|costs money)",
+	"gi",
+);
+for (const match of readme.matchAll(CHARGE_COUNT)) {
 	assert.equal(
 		match[1].toLowerCase(),
-		numberWord(counts.read),
-		`README says "${match[1]} read-only" but the export has ${counts.read}`,
-	);
-}
-for (const match of serverJson.description.matchAll(readOnlyClaim)) {
-	assert.equal(
-		match[1].toLowerCase(),
-		numberWord(counts.read),
-		`server.json says "${match[1]} read-only" but the export has ${counts.read}`,
+		numberWord(counts.billable),
+		`README quotes "${match[1]}" next to a charge, but ${counts.billable} tools are ` +
+			`billable:\n  ${match[0]}`,
 	);
 }
 
@@ -124,6 +180,7 @@ assert.ok(pin.repository.startsWith("https://"), "api-pin.json repository must b
 assert.ok(pin.command.includes("--dump-tools"), "api-pin.json command must be the tool export");
 
 console.log(
-	`ok: ${counts.total} tools (${counts.read} read, ${counts.create} create, ` +
-		`${counts.overwrite} overwrite), nothing that deletes, manifests at ${serverJson.version}`,
+	`ok: ${counts.total} tools (${counts.read} read, ${counts.create} create of which ` +
+		`${counts.billable} billable, ${counts.overwrite} overwrite), nothing that deletes, ` +
+		`manifests at ${serverJson.version}`,
 );

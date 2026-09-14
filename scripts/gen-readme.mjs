@@ -16,10 +16,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
 	README_PATH,
+	assertBillableAreWrites,
 	assertNothingDeletes,
 	capitalize,
 	effectOf,
 	firstSentence,
+	isBillable,
 	numberWord,
 	readTools,
 	toolCounts,
@@ -28,20 +30,29 @@ import {
 const BEGIN = "<!-- BEGIN GENERATED TOOLS — npm run readme:gen -->";
 const END = "<!-- END GENERATED TOOLS -->";
 
-const EFFECT_LABEL = {
-	read: "read",
-	create: "creates work",
-	overwrite: "overwrites a setting",
-};
+/**
+ * The Effect cell.
+ *
+ * "billable" comes from the WRITTEN list in lib/tools.mjs, never from the
+ * annotations — MCP annotations say nothing about money, and inferring it from
+ * them labelled `create_preset` billable when saving a preset is free.
+ */
+function effectLabel(tool) {
+	const effect = effectOf(tool);
+	if (effect === "read") return "read";
+	if (effect === "overwrite") return "overwrites a setting";
+	return isBillable(tool) ? "creates work · billable" : "creates · free";
+}
 
 function render() {
 	const tools = readTools();
 	assertNothingDeletes(tools);
+	assertBillableAreWrites(tools);
 	const counts = toolCounts(tools);
 
 	const rows = tools.map((tool) => {
 		const what = firstSentence(tool.description).replaceAll("|", "\\|");
-		return `| \`${tool.name}\` | ${EFFECT_LABEL[effectOf(tool)]} | ${what} |`;
+		return `| \`${tool.name}\` | ${effectLabel(tool)} | ${what} |`;
 	});
 
 	const writes = counts.create + counts.overwrite;
@@ -50,7 +61,8 @@ function render() {
 		`## Tools (${counts.total})`,
 		"",
 		`${capitalize(numberWord(counts.total))} tools: ${numberWord(counts.read)} only read, ` +
-			`${numberWord(counts.create)} start work you are billed for, and ` +
+			`${numberWord(counts.create)} create something — ${numberWord(counts.billable)} of those ` +
+			"start work you are billed for, and saving a preset is free — and " +
 			`${numberWord(counts.overwrite)} overwrite a setting that only affects work created after it. ` +
 			"No tool on this surface deletes, cancels, removes or rotates anything.",
 		"",
@@ -59,7 +71,7 @@ function render() {
 		...rows,
 		"",
 		`*Generated from [\`tools.json\`](./tools.json) by \`npm run readme:gen\` — do not edit by hand. ` +
-			`Read-only: ${counts.read}. Writing: ${writes}.*`,
+			`Read-only: ${counts.read}. Writing: ${writes}. Billable: ${counts.billable}.*`,
 		END,
 	];
 	return lines.join("\n");
