@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "The api release whose tool export is vendored in tools.json.",
+    "tools.json is NOT hand-written: it is the byte-exact stdout of `command` run",
+    "in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs re-runs it",
+    "and refuses any difference. Bump `ref` and run `npm run tools:sync` in the same",
+    "commit as any tool-surface change, then regenerate the README with",
+    "`npm run readme:gen`."
+  ],
+  "repository": "https://github.com/transcodely/api.git",
+  "ref": "v5.20.0",
+  "command": "go run ./cmd/mcp --dump-tools"
+}
