@@ -135,13 +135,19 @@ it in turn. Two checks hold that chain:
 To land a tool-surface change:
 
 ```bash
-# from a local api checkout on the release you are vendoring
-TRANSCODELY_API_PATH=~/git/transcodely/api npm run tools:sync
+# 1. point api-pin.json's "ref" at the release you are vendoring
+# 2. read a DETACHED WORKTREE at that tag — never the shared api checkout,
+#    which other sessions commit to and which sits on master
+git -C ~/git/transcodely/api worktree add --detach /tmp/api-pin v5.X.0
+TRANSCODELY_API_PATH=/tmp/api-pin npm run tools:sync
 npm run readme:gen
-# bump "ref" in api-pin.json to that release, and the version in
-# server.json + package.json, in the same commit
+git -C ~/git/transcodely/api worktree remove /tmp/api-pin
+# 3. bump the version in server.json + package.json, in the same commit
 npm test
 ```
+
+Or skip step 2 entirely: with `API_REPO_TOKEN` set and no `TRANSCODELY_API_PATH`, the script
+clones the pinned tag itself. That is the only mode that verifies the pin, so prefer it.
 
 **The honest limitation:** `transcodely/api` is a private repository, so the parity job needs
 a read token in `API_REPO_TOKEN` and cannot run on a pull request from a fork. When the token

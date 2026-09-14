@@ -1,11 +1,20 @@
 {
   "_comment": [
-    "The api release whose tool export is vendored in tools.json.",
-    "tools.json is NOT hand-written: it is the byte-exact stdout of `command` run",
-    "in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs re-runs it",
-    "and refuses any difference. Bump `ref` and run `npm run tools:sync` in the same",
-    "commit as any tool-surface change, then regenerate the README with",
-    "`npm run readme:gen`."
+    "The api release this repo REQUIRES: tools.json must be the byte-exact stdout of",
+    "`command` run in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs",
+    "re-runs it and refuses any difference.",
+    "",
+    "`ref` is a requirement, not a record of what exists. At the time of writing the",
+    "latest api tag is v5.19.0 and v5.20.0 has NOT been cut; the parity job will fail",
+    "loudly on the clone until it is, which is the intended behaviour. Correct `ref` to",
+    "whatever tag actually ships the fifteen-tool surface before publishing.",
+    "",
+    "Re-vendoring must read a DETACHED WORKTREE at that tag, never the shared api",
+    "checkout, which other sessions commit to and which sits on master:",
+    "  git -C <api> worktree add --detach /tmp/api-pin <ref>",
+    "  TRANSCODELY_API_PATH=/tmp/api-pin npm run tools:sync && npm run readme:gen",
+    "Better still, omit TRANSCODELY_API_PATH and let the script clone the pinned ref",
+    "itself — the only mode that verifies the pin."
   ],
   "repository": "https://github.com/transcodely/api.git",
   "ref": "v5.20.0",
