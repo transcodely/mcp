@@ -4,7 +4,11 @@ on:
     branches: [master]
   pull_request:
 jobs:
-  introspect:
+  # Always runs: no api checkout, no credentials, works on fork PRs. This is
+  # the gate. It holds everything this repo says about the tool surface to
+  # tools.json — counts, annotations, the "nothing deletes" promise, the
+  # generated README table, and the manifest versions.
+  vendored:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,4 +16,34 @@ jobs:
         with:
           node-version: 22
       - run: npm install --omit=dev --no-audit --no-fund
+      - run: node test/vendored.mjs
       - run: node test/introspect.mjs
+      - run: node scripts/gen-readme.mjs --check
+
+  # Proves tools.json is byte-exact with the api release pinned in
+  # api-pin.json. transcodely/api is private, so this needs a read token:
+  # without one the script exits 78 and the job says NOT ARMED rather than
+  # reporting a pass it did not earn. Fork PRs never get the secret.
+  api-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Check tools.json against the pinned api release
+        env:
+          API_REPO_TOKEN: ${{ secrets.API_REPO_TOKEN }}
+        run: |
+          set +e
+          node scripts/check-api-parity.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 78 ]; then
+            echo "::warning title=api parity not armed::No API_REPO_TOKEN; tools.json was NOT checked against the api export."
+            exit 0
+          fi
+          exit "$code"

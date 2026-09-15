@@ -1,286 +1,194 @@
-[
-  {
-    "annotations": {
-      "destructiveHint": false,
-      "title": "Create transcoding job"
-    },
-    "description": "Create a transcoding job. Reads a source video from a URL (gs://, s3://, or https://) and produces one or more output renditions. Outputs are written to a storage origin you own (pass output_origin_id); to produce a hosted, playable video instead, use create_video_from_url. Returns the job id, status, and a per-output pricing/status summary. Validation (codec x container compatibility, limits, required fields) is performed server-side and surfaced as a machine-readable error.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "input_url": {
-          "description": "Source video to transcode. Supported schemes: gs:// (Google Cloud Storage), s3:// (S3-compatible), https://.",
-          "type": "string"
-        },
-        "metadata": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Arbitrary string key/value pairs echoed back on the job.",
-          "type": "object"
-        },
-        "output_origin_id": {
-          "description": "Storage origin (ori_...) to write outputs to. Required unless the job targets managed hosting; a job without it is rejected with output_origin_id required.",
-          "type": "string"
-        },
-        "outputs": {
-          "description": "Output renditions to produce (1-10).",
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "format": {
-                "description": "Container or packaging format: mp4, webm, mkv, mov, hls, dash, or adaptive.",
-                "type": "string"
-              },
-              "path": {
-                "description": "Output path template override for this rendition (e.g. \"{job_id}/{output_id}/video.mp4\").",
-                "type": "string"
-              },
-              "preset": {
-                "description": "Preset applied to this output as a base (id like pst_xxx or slug). Overrides the job-level preset; the fields above override the preset.",
-                "type": "string"
-              },
-              "quality_tier": {
-                "description": "Quality tier: economy, standard (default), or premium. Higher tiers cost more.",
-                "type": "string"
-              },
-              "resolution": {
-                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution or inherit from a preset.",
-                "type": "string"
-              },
-              "video_codec": {
-                "description": "Video codec: h264 (default), h265, vp9, or av1. Must be compatible with the chosen format.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "format"
-            ],
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "preset": {
-          "description": "Preset applied to every output as a base (id like pst_xxx or slug like gaming_1080p_60_standard). Per-output fields override it.",
-          "type": "string"
-        },
-        "priority": {
-          "description": "Scheduling priority: economy, standard (default), or premium. Does not affect cost.",
-          "type": "string"
-        },
-        "webhook_url": {
-          "description": "HTTPS endpoint to receive job lifecycle webhook events (job.completed, job.failed, ...).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "input_url",
-        "outputs"
-      ],
-      "type": "object"
-    },
-    "name": "create_job",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "created_at": {
-          "type": "string"
-        },
-        "currency": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "object": {
-          "type": "string"
-        },
-        "outputs": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "estimated_cost": {
-                "type": [
-                  "null",
-                  "number"
-                ]
-              },
-              "format": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "status",
-              "format"
-            ],
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "status": {
-          "type": "string"
-        },
-        "total_estimated_cost": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "video_id": {
-          "type": [
-            "null",
-            "string"
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "status",
-        "currency",
-        "outputs",
-        "created_at"
-      ],
-      "type": "object"
-    }
+{
+  "server": {
+    "name": "transcodely"
   },
-  {
-    "annotations": {
-      "destructiveHint": false,
-      "title": "Ingest and host video"
-    },
-    "description": "Ingest a remote https:// video and host it in one call — this is the tool for \"transcode and host this, give me a link\". Downloads the URL, transcodes it into an adaptive streaming ladder, and returns a hosted video (vid_...) with status \"processing\". The URL must be publicly reachable over http(s); private/internal targets are rejected (SSRF protection). Visibility follows the app's hosting default, \"unlisted\" when the app has not set one (playable by anyone with the link, not listed publicly). Enables managed hosting for the app on first use — a one-way change, after which hosted storage and egress bill at the standard rates. To finish the job: poll get_video with the returned id every ~10s until status is \"ready\" (typically under a few minutes for a short clip), then give the user playback.player_url — that is the durable, clickable link.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "description": {
-          "description": "Longer description for the hosted video.",
-          "type": "string"
-        },
-        "preset": {
-          "description": "Preset (id like pst_xxx or slug) driving the transcode. Omit to use the app's default adaptive ladder.",
-          "type": "string"
-        },
-        "tags": {
-          "description": "Freeform tags to attach to the video.",
-          "items": {
+  "tools": [
+    {
+      "name": "create_job",
+      "title": "Create transcoding job",
+      "description": "Create a transcoding job. Reads a source video from a URL (gs://, s3://, or https://) and produces one or more output renditions. Outputs are written to a storage origin you own (pass output_origin_id); to produce a hosted, playable video instead, use create_video_from_url. Returns the job id, status, and a per-output pricing/status summary. Validation (codec x container compatibility, limits, required fields) is performed server-side and surfaced as a machine-readable error.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "input_url": {
+            "description": "Source video to transcode. Supported schemes: gs:// (Google Cloud Storage), s3:// (S3-compatible), https://.",
             "type": "string"
           },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "title": {
-          "description": "Display title for the hosted video.",
-          "type": "string"
-        },
-        "url": {
-          "description": "Publicly reachable https:// source video to ingest. Private/internal hosts are rejected (SSRF protection).",
-          "type": "string"
-        },
-        "visibility": {
-          "description": "Access level: public, unlisted, or private. Omit to use the app's hosting default visibility (unlisted if the app has not set one).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "url"
-      ],
-      "type": "object"
-    },
-    "name": "create_video_from_url",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "created_at": {
-          "type": "string"
-        },
-        "description": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "duration_seconds": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "encoding_cost": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "job_id": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "object": {
-          "type": "string"
-        },
-        "output_storage_prefix": {
-          "type": "string"
-        },
-        "playback": {
-          "additionalProperties": false,
-          "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
-          "properties": {
-            "expires_at": {
-              "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
+          "metadata": {
+            "additionalProperties": {
               "type": "string"
             },
-            "hls_url": {
-              "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
-              "type": "string"
-            },
-            "player_url": {
-              "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
-              "type": "string"
-            }
+            "description": "Arbitrary string key/value pairs echoed back on the job.",
+            "type": "object"
           },
-          "type": [
-            "null",
-            "object"
-          ]
+          "output_origin_id": {
+            "description": "Storage origin (ori_...) to write outputs to. Required unless the job targets managed hosting; a job without it is rejected with output_origin_id required.",
+            "type": "string"
+          },
+          "outputs": {
+            "description": "Output renditions to produce (1-10).",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "format": {
+                  "description": "Container or packaging format: mp4, webm, mkv, mov, hls, dash, or adaptive.",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Output path template override for this rendition (e.g. \"{job_id}/{output_id}/video.mp4\").",
+                  "type": "string"
+                },
+                "preset": {
+                  "description": "Preset applied to this output as a base (id like pst_xxx or slug). Overrides the job-level preset; the fields above override the preset.",
+                  "type": "string"
+                },
+                "quality_tier": {
+                  "description": "Quality tier: economy, standard (default), or premium. Higher tiers cost more.",
+                  "type": "string"
+                },
+                "resolution": {
+                  "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution or inherit from a preset.",
+                  "type": "string"
+                },
+                "video_codec": {
+                  "description": "Video codec: h264 (default), h265, vp9, or av1. Must be compatible with the chosen format.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "format"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "preset": {
+            "description": "Preset applied to every output as a base (id like pst_xxx or slug like gaming_1080p_60_standard). Per-output fields override it.",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Scheduling priority: economy, standard (default), or premium. Does not affect cost.",
+            "type": "string"
+          },
+          "webhook_url": {
+            "description": "HTTPS endpoint to receive job lifecycle webhook events (job.completed, job.failed, ...).",
+            "type": "string"
+          }
         },
-        "poster_url": {
-          "type": [
-            "null",
-            "string"
-          ]
+        "required": [
+          "input_url",
+          "outputs"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "estimated_cost": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "format": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "format"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "total_estimated_cost": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "video_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
         },
-        "ready_at": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "renditions": {
-          "items": {
+        "required": [
+          "id",
+          "object",
+          "status",
+          "currency",
+          "outputs",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "create_preset",
+      "title": "Create preset",
+      "description": "Create a custom encoding preset for this app: a named, reusable bundle of encoding settings that create_job can reference by slug. Requires a slug (lowercase letters, digits and underscores, 3-64 characters, permanent once created and unique within the app), a name, a container and video/audio settings. Creating a preset changes nothing about jobs that already exist: presets are read and expanded when a job is created, so a preset only affects jobs created after it. Repeating the call with the same slug fails with already_exists rather than creating a second one.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
             "additionalProperties": false,
+            "description": "Audio encoding settings.",
             "properties": {
               "bitrate_kbps": {
+                "description": "Audio bitrate in kbps.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "channels": {
+                "description": "Channel count. Omit to keep the source's.",
                 "maximum": 2147483647,
                 "minimum": -2147483648,
                 "type": [
@@ -289,29 +197,21 @@
                 ]
               },
               "codec": {
+                "description": "Audio codec: aac (default), opus, mp3, or flac.",
+                "enum": [
+                  "aac",
+                  "opus",
+                  "mp3",
+                  "flac"
+                ],
                 "type": "string"
               },
-              "height": {
-                "maximum": 2147483647,
-                "minimum": -2147483648,
-                "type": [
-                  "null",
-                  "integer"
-                ]
+              "normalize": {
+                "description": "Apply loudness normalization.",
+                "type": "boolean"
               },
-              "id": {
-                "type": "string"
-              },
-              "resolution": {
-                "type": "string"
-              },
-              "size_bytes": {
-                "type": [
-                  "null",
-                  "integer"
-                ]
-              },
-              "width": {
+              "sample_rate": {
+                "description": "Sample rate in Hz. Omit to keep the source's.",
                 "maximum": 2147483647,
                 "minimum": -2147483648,
                 "type": [
@@ -320,418 +220,232 @@
                 ]
               }
             },
-            "required": [
-              "id",
-              "resolution",
-              "codec"
-            ],
             "type": "object"
           },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "status": {
-          "type": "string"
-        },
-        "tags": {
-          "items": {
+          "container": {
+            "description": "Container format: mp4, webm, mkv, or mov.",
+            "enum": [
+              "mp4",
+              "webm",
+              "mkv",
+              "mov"
+            ],
             "type": "string"
           },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "title": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "visibility": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "status",
-        "visibility",
-        "renditions",
-        "created_at"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false,
-      "title": "Generate AI captions"
-    },
-    "description": "Generate AI captions (subtitles) for a hosted video by id (vid_...). Creates a billable captions job: speech is transcribed into a WebVTT subtitle track in the given language (default \"auto\" to detect the spoken language), attached to the video when the job completes. Billed per source minute; the fee is only charged when a caption track is actually delivered. Idempotent per video+language: repeating the call returns the existing job instead of creating and billing a new one.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "language": {
-          "description": "ISO 639-2 language code for the captions (e.g. eng, spa, bul). Defaults to \"auto\" to detect the spoken language.",
-          "type": "string"
-        },
-        "video_id": {
-          "description": "Hosted video id to caption (vid_...).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "video_id"
-      ],
-      "type": "object"
-    },
-    "name": "generate_captions",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "job_id": {
-          "type": "string"
-        },
-        "language": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        },
-        "video_id": {
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  {
-    "annotations": {
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": "Get job status"
-    },
-    "description": "Get a concise status snapshot for a transcoding job by id (job_...): overall status and progress, any error code/message, and per-output status/progress with errors. Lighter than the full job record — use it to poll a job to completion.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "description": "Job id to inspect (job_...).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "get_job_status",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "completed_at": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "created_at": {
-          "type": "string"
-        },
-        "error_code": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "error_message": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "outputs": {
-          "items": {
+          "content_type": {
+            "description": "Content type for encoder tuning: film, animation, grain, gaming, sports, or stillimage.",
+            "enum": [
+              "film",
+              "animation",
+              "grain",
+              "gaming",
+              "sports",
+              "stillimage"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "delivery_format": {
+            "description": "Delivery format: progressive, hls, dash, or cmaf.",
+            "enum": [
+              "progressive",
+              "hls",
+              "dash",
+              "cmaf"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "description": "Optional description (up to 1024 characters).",
+            "type": "string"
+          },
+          "disable_audio": {
+            "description": "Produce video-only outputs (no audio). Defaults to false.",
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "faststart": {
+            "description": "Move the MP4 index to the front for progressive playback. Defaults to true.",
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "name": {
+            "description": "Human-readable name (1-128 characters).",
+            "type": "string"
+          },
+          "quality_tier": {
+            "description": "Quality tier: economy, standard (default), or premium.",
+            "enum": [
+              "economy",
+              "standard",
+              "premium"
+            ],
+            "type": "string"
+          },
+          "segment_duration": {
+            "description": "Segment duration in seconds for hls/dash (2-30, default 6).",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "slug": {
+            "description": "URL-safe identifier, unique within the app and permanent once created. Lowercase letters, digits and underscores only, 3-64 characters (e.g. \"gaming_1080p_60\").",
+            "type": "string"
+          },
+          "variants": {
+            "description": "Multi-variant ABR ladder (up to 20 rungs). Only valid when delivery_format is hls, dash or cmaf.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "buffer_size_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "crf": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "framerate": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "max_bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "quality": {
+                  "description": "Per-rung quality tier override: economy, standard, or premium.",
+                  "enum": [
+                    "economy",
+                    "standard",
+                    "premium"
+                  ],
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "resolution": {
+                  "description": "Resolution for this rung: 480p, 720p, 1080p, 1440p, 2160p, or 4320p.",
+                  "enum": [
+                    "480p",
+                    "720p",
+                    "1080p",
+                    "1440p",
+                    "2160p",
+                    "4320p"
+                  ],
+                  "type": "string"
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "resolution"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "video": {
             "additionalProperties": false,
+            "description": "Video encoding settings.",
             "properties": {
-              "error_code": {
+              "aq_mode": {
+                "description": "Adaptive quantization mode (0-3).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": [
                   "null",
-                  "string"
+                  "integer"
                 ]
               },
-              "error_message": {
+              "aq_strength": {
+                "description": "Adaptive quantization strength (0.0-3.0).",
                 "type": [
                   "null",
-                  "string"
+                  "number"
                 ]
               },
-              "id": {
-                "type": "string"
+              "bframes": {
+                "description": "Number of B-frames (0-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
               },
-              "progress": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "status",
-              "progress"
-            ],
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "progress": {
-          "type": "integer"
-        },
-        "started_at": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "status": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "status",
-        "progress",
-        "outputs",
-        "created_at"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "annotations": {
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": "Get usage and cost"
-    },
-    "description": "Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. Defaults to the current month; pass month as \"YYYY-MM\" for a specific period.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "month": {
-          "description": "Billing month as \"YYYY-MM\" (e.g. 2026-07). Defaults to the current UTC month.",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "get_usage",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "billing_month": {
-          "type": "string"
-        },
-        "currency": {
-          "type": "string"
-        },
-        "daily": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "date": {
-                "type": "string"
-              },
-              "egress_bytes": {
-                "type": "integer"
-              },
-              "encoding_cost": {
-                "type": "number"
-              },
-              "request_count": {
-                "type": "integer"
-              },
-              "storage_bytes": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "date",
-              "storage_bytes",
-              "egress_bytes",
-              "request_count",
-              "encoding_cost"
-            ],
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "egress_cost": {
-          "type": "number"
-        },
-        "egress_gb": {
-          "type": "number"
-        },
-        "encoding_cost": {
-          "type": "number"
-        },
-        "encoding_minutes": {
-          "type": "number"
-        },
-        "storage_cost": {
-          "type": "number"
-        },
-        "storage_gb_avg": {
-          "type": "number"
-        },
-        "total_cost": {
-          "type": "number"
-        },
-        "total_requests": {
-          "type": "integer"
-        },
-        "videos_encoded": {
-          "maximum": 2147483647,
-          "minimum": -2147483648,
-          "type": "integer"
-        },
-        "videos_hosted": {
-          "maximum": 2147483647,
-          "minimum": -2147483648,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "billing_month",
-        "currency",
-        "videos_encoded",
-        "encoding_minutes",
-        "encoding_cost",
-        "storage_gb_avg",
-        "storage_cost",
-        "videos_hosted",
-        "egress_gb",
-        "egress_cost",
-        "total_requests",
-        "total_cost",
-        "daily"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "annotations": {
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": "Get video"
-    },
-    "description": "Fetch a hosted video by id (vid_...): status, visibility, title, duration, poster image, encoded renditions (resolution, codec, bitrate, dimensions), and — once status is \"ready\" — a playback block. Poll this until status is \"ready\" (statuses: uploading, processing, ready, error); no playback block is present before then. playback.player_url is the durable player page to hand a human, and is issued for public and unlisted videos only — private videos are not served by the player page and get playback.hls_url instead, a signed manifest for your own player that stops working at playback.expires_at (re-fetch with get_video rather than storing it).",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "description": "Hosted video id to fetch (vid_...).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "get_video",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "created_at": {
-          "type": "string"
-        },
-        "description": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "duration_seconds": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "encoding_cost": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "job_id": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "object": {
-          "type": "string"
-        },
-        "output_storage_prefix": {
-          "type": "string"
-        },
-        "playback": {
-          "additionalProperties": false,
-          "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
-          "properties": {
-            "expires_at": {
-              "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
-              "type": "string"
-            },
-            "hls_url": {
-              "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
-              "type": "string"
-            },
-            "player_url": {
-              "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
-              "type": "string"
-            }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
-        },
-        "poster_url": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ready_at": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "renditions": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
               "bitrate_kbps": {
+                "description": "Target bitrate in kbps for cbr/vbr (100-100000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_mode": {
+                "description": "Rate control: crf (quality-targeted), vbr, or cbr.",
+                "enum": [
+                  "crf",
+                  "cbr",
+                  "vbr"
+                ],
+                "type": "string"
+              },
+              "buffer_size_kbps": {
+                "description": "VBV buffer size in kbps (100-480000).",
                 "maximum": 2147483647,
                 "minimum": -2147483648,
                 "type": [
@@ -740,9 +454,17 @@
                 ]
               },
               "codec": {
+                "description": "Video codec: h264 (default), h265, vp9, or av1.",
+                "enum": [
+                  "h264",
+                  "h265",
+                  "vp9",
+                  "av1"
+                ],
                 "type": "string"
               },
-              "height": {
+              "crf": {
+                "description": "Constant Rate Factor; lower is higher quality and larger files. 15-35 for h264, 18-35 for h265, 15-50 for vp9, 20-55 for av1.",
                 "maximum": 2147483647,
                 "minimum": -2147483648,
                 "type": [
@@ -750,19 +472,128 @@
                   "integer"
                 ]
               },
-              "id": {
-                "type": "string"
+              "deblock": {
+                "description": "Deblocking filter, \"alpha:beta\" (e.g. \"0:0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
-              "resolution": {
-                "type": "string"
+              "encoder_preset": {
+                "description": "Encoder speed preset. h264/h265: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower. av1: \"3\"-\"12\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
-              "size_bytes": {
+              "framerate": {
+                "description": "Target frame rate (0 = keep the source's, max 240).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": [
                   "null",
                   "integer"
+                ]
+              },
+              "height": {
+                "description": "Custom output height in pixels (128-4320).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "keyint": {
+                "description": "GOP size in frames (1-600).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "level": {
+                "description": "Codec level, e.g. \"3.0\", \"4.0\", \"5.1\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "max_bitrate_kbps": {
+                "description": "VBV maximum bitrate in kbps (100-240000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "min_keyint": {
+                "description": "Minimum keyframe interval (1-60).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "profile": {
+                "description": "Codec profile: baseline, main or high for h264; main or main10 for h265.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "psy_rd": {
+                "description": "Psychovisual rate-distortion, \"strength:trellis\" (e.g. \"1.0:0.0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "rc_lookahead": {
+                "description": "Rate-control lookahead frames (0-250).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "refs": {
+                "description": "Number of reference frames (1-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "resolution": {
+                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution. Use this OR width+height.",
+                "enum": [
+                  "480p",
+                  "720p",
+                  "1080p",
+                  "1440p",
+                  "2160p",
+                  "4320p"
+                ],
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "tune": {
+                "description": "Content-aware tuning. h264: film, animation, grain, stillimage, fastdecode. h265: grain, fastdecode.",
+                "type": [
+                  "null",
+                  "string"
                 ]
               },
               "width": {
+                "description": "Custom output width in pixels (128-7680). Use with height for non-standard aspect ratios.",
                 "maximum": 2147483647,
                 "minimum": -2147483648,
                 "type": [
@@ -771,112 +602,970 @@
                 ]
               }
             },
-            "required": [
-              "id",
-              "resolution",
-              "codec"
-            ],
             "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
+          }
         },
-        "status": {
-          "type": "string"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
-        "title": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "visibility": {
-          "type": "string"
-        }
+        "required": [
+          "slug",
+          "name",
+          "container",
+          "video",
+          "audio"
+        ],
+        "type": "object"
       },
-      "required": [
-        "id",
-        "object",
-        "status",
-        "visibility",
-        "renditions",
-        "created_at"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "annotations": {
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": "List jobs"
-    },
-    "description": "List transcoding jobs for the authenticated app, newest first. Optionally filter by status. Returns compact rows (id, status, progress, input_url, cost, timestamps) plus next_cursor for pagination; pass it back as cursor to fetch the next page.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "cursor": {
-          "description": "Pagination cursor from a previous response's next_cursor. Omit for the first page.",
-          "type": "string"
-        },
-        "limit": {
-          "description": "Maximum jobs to return (1-100). Defaults to 20.",
-          "type": "integer"
-        },
-        "status": {
-          "description": "Filter by job status: pending, probing, processing, completed, failed, canceled, partial, or awaiting_confirmation. Omit for all statuses.",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "name": "list_jobs",
-    "outputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "jobs": {
-          "items": {
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
             "additionalProperties": false,
             "properties": {
-              "created_at": {
-                "type": "string"
-              },
-              "currency": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "input_url": {
-                "type": "string"
-              },
-              "priority": {
-                "type": "string"
-              },
-              "progress": {
+              "bitrate_kbps": {
+                "description": "Audio bitrate in kbps.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
-              "status": {
+              "channels": {
+                "description": "Channel count. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Audio codec: aac (default), opus, mp3, or flac.",
                 "type": "string"
               },
-              "total_actual_cost": {
+              "normalize": {
+                "description": "Apply loudness normalization.",
+                "type": "boolean"
+              },
+              "sample_rate": {
+                "description": "Sample rate in Hz. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "container": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "delivery_format": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disable_audio": {
+            "type": "boolean"
+          },
+          "estimated_cost_per_minute": {
+            "description": "Estimated encoding cost per source minute in EUR, when it can be computed from the preset's settings.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "faststart": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "quality_tier": {
+            "type": "string"
+          },
+          "segment_duration": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "system_preset": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "buffer_size_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "crf": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "framerate": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "max_bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "quality": {
+                  "description": "Per-rung quality tier override: economy, standard, or premium.",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "resolution": {
+                  "description": "Resolution for this rung: 480p, 720p, 1080p, 1440p, 2160p, or 4320p.",
+                  "type": "string"
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "resolution"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "video": {
+            "additionalProperties": false,
+            "properties": {
+              "aq_mode": {
+                "description": "Adaptive quantization mode (0-3).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "aq_strength": {
+                "description": "Adaptive quantization strength (0.0-3.0).",
                 "type": [
                   "null",
                   "number"
                 ]
               },
-              "total_estimated_cost": {
+              "bframes": {
+                "description": "Number of B-frames (0-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_kbps": {
+                "description": "Target bitrate in kbps for cbr/vbr (100-100000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_mode": {
+                "description": "Rate control: crf (quality-targeted), vbr, or cbr.",
+                "type": "string"
+              },
+              "buffer_size_kbps": {
+                "description": "VBV buffer size in kbps (100-480000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Video codec: h264 (default), h265, vp9, or av1.",
+                "type": "string"
+              },
+              "crf": {
+                "description": "Constant Rate Factor; lower is higher quality and larger files. 15-35 for h264, 18-35 for h265, 15-50 for vp9, 20-55 for av1.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "deblock": {
+                "description": "Deblocking filter, \"alpha:beta\" (e.g. \"0:0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "encoder_preset": {
+                "description": "Encoder speed preset. h264/h265: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower. av1: \"3\"-\"12\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "framerate": {
+                "description": "Target frame rate (0 = keep the source's, max 240).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "height": {
+                "description": "Custom output height in pixels (128-4320).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "keyint": {
+                "description": "GOP size in frames (1-600).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "level": {
+                "description": "Codec level, e.g. \"3.0\", \"4.0\", \"5.1\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "max_bitrate_kbps": {
+                "description": "VBV maximum bitrate in kbps (100-240000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "min_keyint": {
+                "description": "Minimum keyframe interval (1-60).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "profile": {
+                "description": "Codec profile: baseline, main or high for h264; main or main10 for h265.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "psy_rd": {
+                "description": "Psychovisual rate-distortion, \"strength:trellis\" (e.g. \"1.0:0.0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "rc_lookahead": {
+                "description": "Rate-control lookahead frames (0-250).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "refs": {
+                "description": "Number of reference frames (1-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "resolution": {
+                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution. Use this OR width+height.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "tune": {
+                "description": "Content-aware tuning. h264: film, animation, grain, stillimage, fastdecode. h265: grain, fastdecode.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "width": {
+                "description": "Custom output width in pixels (128-7680). Use with height for non-standard aspect ratios.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "slug",
+          "name",
+          "container",
+          "faststart",
+          "delivery_format",
+          "video",
+          "audio",
+          "disable_audio",
+          "quality_tier",
+          "system_preset",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "create_video_from_url",
+      "title": "Ingest and host video",
+      "description": "Ingest a remote https:// video and host it in one call — this is the tool for \"transcode and host this, give me a link\". Downloads the URL, transcodes it into an adaptive streaming ladder, and returns a hosted video (vid_...) with status \"processing\". The URL must be publicly reachable over http(s); private/internal targets are rejected (SSRF protection). Visibility follows the app's hosting default, \"unlisted\" when the app has not set one (playable by anyone with the link, not listed publicly). Enables managed hosting for the app on first use — a one-way change, after which hosted storage and egress bill at the standard rates. To finish the job: poll get_video with the returned id every ~10s until status is \"ready\" (typically under a few minutes for a short clip), then give the user playback.player_url — that is the durable, clickable link.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "description": "Longer description for the hosted video.",
+            "type": "string"
+          },
+          "preset": {
+            "description": "Preset (id like pst_xxx or slug) driving the transcode. Omit to use the app's default adaptive ladder.",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Freeform tags to attach to the video.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "title": {
+            "description": "Display title for the hosted video.",
+            "type": "string"
+          },
+          "url": {
+            "description": "Publicly reachable https:// source video to ingest. Private/internal hosts are rejected (SSRF protection).",
+            "type": "string"
+          },
+          "visibility": {
+            "description": "Access level: public, unlisted, or private. Omit to use the app's hosting default visibility (unlisted if the app has not set one).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "duration_seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "encoding_cost": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "object": {
+            "type": "string"
+          },
+          "output_storage_prefix": {
+            "type": "string"
+          },
+          "playback": {
+            "additionalProperties": false,
+            "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
+            "properties": {
+              "expires_at": {
+                "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
+                "type": "string"
+              },
+              "hls_url": {
+                "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
+                "type": "string"
+              },
+              "player_url": {
+                "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
+                "type": "string"
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "poster_url": {
+            "description": "Fetchable CDN URL of the poster image. Signed and short-lived on a token-auth delivery zone, so fetch a fresh one via get_video rather than storing it. Absent while the video is still processing, and for a video with no generated poster.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ready_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "renditions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec": {
+                  "type": "string"
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "resolution": {
+                  "type": "string"
+                },
+                "size_bytes": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "resolution",
+                "codec"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "status",
+          "visibility",
+          "renditions",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "generate_captions",
+      "title": "Generate AI captions",
+      "description": "Generate AI captions (subtitles) for a hosted video by id (vid_...). Creates a billable captions job: speech is transcribed into a WebVTT subtitle track in the given language (default \"auto\" to detect the spoken language), attached to the video when the job completes. Billed per source minute; the fee is only charged when a caption track is actually delivered. Idempotent per video+language: repeating the call returns the existing job instead of creating and billing a new one.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "description": "ISO 639-2 language code for the captions (e.g. eng, spa, bul). Defaults to \"auto\" to detect the spoken language.",
+            "type": "string"
+          },
+          "video_id": {
+            "description": "Hosted video id to caption (vid_...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "video_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_ingest_rule",
+      "title": "Get ingest rule",
+      "description": "Fetch one ingest rule by id (ing_...): its origin, enabled state, filters, the job it submits, and its event/job counts. No secret material is returned — a rule's inbound secret is shown once, when it is created or rotated, and never by this server.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Ingest rule to fetch (ing_...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "The job this rule submits for a matching object, in the same shape create_job accepts."
+          },
+          "app_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "events_received": {
+            "type": "integer"
+          },
+          "filters": {
+            "additionalProperties": false,
+            "properties": {
+              "content_types": {
+                "description": "Reported content type must be any one of these, compared case-insensitively.",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "max_bytes": {
+                "type": "integer"
+              },
+              "min_bytes": {
+                "type": "integer"
+              },
+              "prefix": {
+                "description": "Object key must start with this.",
+                "type": "string"
+              },
+              "suffixes": {
+                "description": "Object key may end with any one of these, compared case-insensitively.",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobs_created": {
+            "type": "integer"
+          },
+          "last_event_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "origin_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "app_id",
+          "origin_id",
+          "name",
+          "enabled",
+          "filters",
+          "events_received",
+          "jobs_created",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_job_status",
+      "title": "Get job status",
+      "description": "Get a concise status snapshot for a transcoding job by id (job_...): overall status and progress, any error code/message, and per-output status/progress with errors. Each measured output also carries a report summary — whether the produced file matched the request, which properties differ if it did not, and its codec, resolution and duration. Lighter than the full job record — use it to poll a job to completion.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Job id to inspect (job_...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "error_code": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "error_message": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "progress": {
+                  "type": "integer"
+                },
+                "report": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "codec": {
+                      "type": "string"
+                    },
+                    "duration_seconds": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "matches_request": {
+                      "type": "boolean"
+                    },
+                    "mismatches": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": [
+                        "null",
+                        "array"
+                      ]
+                    },
+                    "resolution": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "matches_request"
+                  ],
+                  "type": [
+                    "null",
+                    "object"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "progress"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "progress": {
+            "type": "integer"
+          },
+          "started_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "progress",
+          "outputs",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_output_report",
+      "title": "Get output report",
+      "description": "Get the full measurement report for one job output (job_... plus out_...): what the produced file turned out to BE, measured from the written file, and the verdict of comparing that against what the job asked for. Returns the container, the video stream (codec, profile, level, pixel format, dimensions, frame rate, bitrate, color signaling, HDR format), every audio stream, the measured duration, and — when the verdict is that it does not match — each differing property with its expected and actual value. Use it when get_job_status reports a mismatch and you need the values, or to confirm an encode really delivered what was requested. measured is false when the output has no report yet (still running, or it produced no file); that is not an error.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "description": "Job that produced the output (job_...).",
+            "type": "string"
+          },
+          "output_id": {
+            "description": "Output to report on (out_...), as returned by create_job or get_job_status.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "output_id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "content_aware": {
+            "additionalProperties": false,
+            "description": "Content-aware encoding this output requested, when it requested any.",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "vmaf_target": {
                 "type": [
                   "null",
                   "number"
@@ -884,33 +1573,2342 @@
               }
             },
             "required": [
-              "id",
-              "status",
-              "progress",
-              "input_url",
-              "priority",
-              "currency",
-              "created_at"
+              "mode"
+            ],
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "format": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "measured": {
+            "type": "boolean"
+          },
+          "output_id": {
+            "type": "string"
+          },
+          "report": {
+            "additionalProperties": false,
+            "properties": {
+              "audio": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bitrate_kbps": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "channels": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "codec": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string"
+                    },
+                    "sample_rate_hz": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "checked_at": {
+                "type": "string"
+              },
+              "container": {
+                "description": "Delivery format of the produced output: mp4, mov, webm, mkv, hls, dash, or adaptive.",
+                "type": "string"
+              },
+              "duration_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "verdict": {
+                "additionalProperties": false,
+                "properties": {
+                  "matches_request": {
+                    "type": "boolean"
+                  },
+                  "mismatches": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "actual": {
+                          "type": "string"
+                        },
+                        "expected": {
+                          "type": "string"
+                        },
+                        "field": {
+                          "description": "Which property differs: container, video.present, video.codec, video.profile, video.pix_fmt, video.resolution, video.width, video.height, video.frame_rate, video.color.transfer, video.color.primaries, audio.present, or duration_seconds.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field",
+                        "expected",
+                        "actual"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  }
+                },
+                "required": [
+                  "matches_request"
+                ],
+                "type": "object"
+              },
+              "video": {
+                "additionalProperties": false,
+                "properties": {
+                  "bitrate_kbps": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "codec": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "matrix": {
+                        "type": "string"
+                      },
+                      "primaries": {
+                        "type": "string"
+                      },
+                      "range": {
+                        "type": "string"
+                      },
+                      "transfer": {
+                        "type": "string"
+                      }
+                    },
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
+                  "frame_rate": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "hdr_format": {
+                    "description": "HDR signaling read from the produced stream: none, hdr10, or hlg. An HDR10+ or Dolby Vision output reads as hdr10, the static layer it also genuinely signals.",
+                    "type": "string"
+                  },
+                  "height": {
+                    "type": "integer"
+                  },
+                  "level": {
+                    "type": "string"
+                  },
+                  "pix_fmt": {
+                    "type": "string"
+                  },
+                  "profile": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": "integer"
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              }
+            },
+            "required": [
+              "verdict",
+              "checked_at"
+            ],
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "output_id",
+          "status",
+          "format",
+          "measured"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_usage",
+      "title": "Get usage and cost",
+      "description": "Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. Defaults to the current month; pass month as \"YYYY-MM\" for a specific period.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "month": {
+            "description": "Billing month as \"YYYY-MM\" (e.g. 2026-07). Defaults to the current UTC month.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "billing_month": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "daily": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "egress_bytes": {
+                  "type": "integer"
+                },
+                "encoding_cost": {
+                  "type": "number"
+                },
+                "request_count": {
+                  "type": "integer"
+                },
+                "storage_bytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "date",
+                "storage_bytes",
+                "egress_bytes",
+                "request_count",
+                "encoding_cost"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "egress_cost": {
+            "type": "number"
+          },
+          "egress_gb": {
+            "type": "number"
+          },
+          "encoding_cost": {
+            "type": "number"
+          },
+          "encoding_minutes": {
+            "type": "number"
+          },
+          "storage_cost": {
+            "type": "number"
+          },
+          "storage_gb_avg": {
+            "type": "number"
+          },
+          "total_cost": {
+            "type": "number"
+          },
+          "total_requests": {
+            "type": "integer"
+          },
+          "videos_encoded": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "videos_hosted": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "billing_month",
+          "currency",
+          "videos_encoded",
+          "encoding_minutes",
+          "encoding_cost",
+          "storage_gb_avg",
+          "storage_cost",
+          "videos_hosted",
+          "egress_gb",
+          "egress_cost",
+          "total_requests",
+          "total_cost",
+          "daily"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_video",
+      "title": "Get video",
+      "description": "Fetch a hosted video by id (vid_...): status, visibility, title, duration, poster image, encoded renditions (resolution, codec, bitrate, dimensions), and — once status is \"ready\" — a playback block. Poll this until status is \"ready\" (statuses: uploading, processing, ready, error); no playback block is present before then. playback.player_url is the durable player page to hand a human, and is issued for public and unlisted videos only — private videos are not served by the player page and get playback.hls_url instead, a signed manifest for your own player that stops working at playback.expires_at (re-fetch with get_video rather than storing it).",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Hosted video id to fetch (vid_...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "duration_seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "encoding_cost": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "object": {
+            "type": "string"
+          },
+          "output_storage_prefix": {
+            "type": "string"
+          },
+          "playback": {
+            "additionalProperties": false,
+            "description": "Where to watch this video. Present once status is \"ready\"; absent while it is still processing. Contains player_url (durable page to hand a human, public/unlisted only) and hls_url with expires_at (short-lived manifest for your own player).",
+            "properties": {
+              "expires_at": {
+                "description": "RFC 3339 time at which hls_url stops working. Absent when hls_url is unsigned and durable. Does not apply to player_url.",
+                "type": "string"
+              },
+              "hls_url": {
+                "description": "HLS manifest (master.m3u8) for embedding in your own player. Signed and short-lived when the delivery zone uses token auth — see expires_at. Fetch a fresh one via get_video rather than storing it.",
+                "type": "string"
+              },
+              "player_url": {
+                "description": "Durable, shareable player page for this video. Present for public and unlisted videos; never for private ones (the player page does not serve them). Never expires.",
+                "type": "string"
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "poster_url": {
+            "description": "Fetchable CDN URL of the poster image. Signed and short-lived on a token-auth delivery zone, so fetch a fresh one via get_video rather than storing it. Absent while the video is still processing, and for a video with no generated poster.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ready_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "renditions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec": {
+                  "type": "string"
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "resolution": {
+                  "type": "string"
+                },
+                "size_bytes": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "resolution",
+                "codec"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "status",
+          "visibility",
+          "renditions",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_ingest_events",
+      "title": "List ingest events",
+      "description": "List the storage deliveries this app's ingest rules received, newest first, with what became of each: the bucket and object key, the outcome (received, matched, created, skipped or failed), the REASON for a skip or failure, and the job id when one was created. This is the direct answer to \"I uploaded a file and no job appeared\". Filter by rule_id or status.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Maximum events to return (1-100). Defaults to 20.",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Number of events to skip, for paging.",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "rule_id": {
+            "description": "Only events for this rule (ing_...).",
+            "type": "string"
+          },
+          "status": {
+            "description": "Only events with this outcome: received, matched, created, skipped, or failed.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                },
+                "bucket": {
+                  "type": "string"
+                },
+                "content_type": {
+                  "type": "string"
+                },
+                "etag": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "job_id": {
+                  "type": "string"
+                },
+                "object": {
+                  "type": "string"
+                },
+                "object_key": {
+                  "type": "string"
+                },
+                "processed_at": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "received_at": {
+                  "type": "string"
+                },
+                "replay_count": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                },
+                "replayed_at": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "rule_id": {
+                  "type": "string"
+                },
+                "size_bytes": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "source": {
+                  "description": "Where the delivery came from, e.g. s3_sns or gcs_pubsub.",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "object",
+                "rule_id",
+                "bucket",
+                "object_key",
+                "status",
+                "attempts",
+                "replay_count",
+                "received_at"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "total_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "total_count"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_ingest_rules",
+      "title": "List ingest rules",
+      "description": "List this app's ingest rules: the standing instructions that turn an object landing in a storage origin into a transcoding job. Each rule carries the origin it watches, whether it is enabled, the filters an object must satisfy (key prefix, suffixes, content types, size bounds), the job it submits, and its running event/job counts. Start here when an upload did not become a job: a disabled rule still receives events and skips every one. No secret material is returned.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "description": "Only enabled rules (true) or only disabled ones (false). Omit for both.",
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "limit": {
+            "description": "Maximum rules to return (1-100). Defaults to 20.",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Number of rules to skip, for paging.",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "origin_id": {
+            "description": "Only rules on this storage origin (ori_...).",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "description": "The job this rule submits for a matching object, in the same shape create_job accepts."
+                },
+                "app_id": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "events_received": {
+                  "type": "integer"
+                },
+                "filters": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "content_types": {
+                      "description": "Reported content type must be any one of these, compared case-insensitively.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": [
+                        "null",
+                        "array"
+                      ]
+                    },
+                    "max_bytes": {
+                      "type": "integer"
+                    },
+                    "min_bytes": {
+                      "type": "integer"
+                    },
+                    "prefix": {
+                      "description": "Object key must start with this.",
+                      "type": "string"
+                    },
+                    "suffixes": {
+                      "description": "Object key may end with any one of these, compared case-insensitively.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": [
+                        "null",
+                        "array"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "jobs_created": {
+                  "type": "integer"
+                },
+                "last_event_at": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "object": {
+                  "type": "string"
+                },
+                "origin_id": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "object",
+                "app_id",
+                "origin_id",
+                "name",
+                "enabled",
+                "filters",
+                "events_received",
+                "jobs_created",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "total_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rules",
+          "total_count"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_jobs",
+      "title": "List jobs",
+      "description": "List transcoding jobs for the authenticated app, newest first. Optionally filter by status. Returns compact rows (id, status, progress, input_url, cost, timestamps) plus next_cursor for pagination; pass it back as cursor to fetch the next page.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Pagination cursor from a previous response's next_cursor. Omit for the first page.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum jobs to return (1-100). Defaults to 20.",
+            "type": "integer"
+          },
+          "status": {
+            "description": "Filter by job status: pending, probing, processing, completed, failed, canceled, partial, or awaiting_confirmation. Omit for all statuses.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "jobs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "input_url": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string"
+                },
+                "progress": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "total_actual_cost": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "total_estimated_cost": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "progress",
+                "input_url",
+                "priority",
+                "currency",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "total_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "jobs",
+          "total_count"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "list_presets",
+      "title": "List presets",
+      "description": "List the encoding presets available to this app: the read-only ones the platform ships and the app's own custom ones. Each preset carries its full settings (container, delivery format, video and audio encoding, quality tier, ABR ladder) and an estimated cost per source minute where one can be computed. Filter by content_type, quality_tier, video_codec or delivery_format; pass include_system false for custom presets only. Reference a preset from create_job by its id (pst_...) or its slug.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "description": "Filter by content type: film, animation, grain, gaming, sports, or stillimage.",
+            "enum": [
+              "film",
+              "animation",
+              "grain",
+              "gaming",
+              "sports",
+              "stillimage"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "delivery_format": {
+            "description": "Filter by delivery format: progressive, hls, dash, or cmaf.",
+            "enum": [
+              "progressive",
+              "hls",
+              "dash",
+              "cmaf"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "include_system": {
+            "description": "Include the read-only presets the platform ships. Defaults to true.",
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "limit": {
+            "description": "Maximum presets to return (1-100). Defaults to 20.",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Number of presets to skip, for paging. Defaults to 0.",
+            "type": "integer"
+          },
+          "quality_tier": {
+            "description": "Filter by quality tier: economy, standard, or premium.",
+            "enum": [
+              "economy",
+              "standard",
+              "premium"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "video_codec": {
+            "description": "Filter by video codec: h264, h265, vp9, or av1.",
+            "enum": [
+              "h264",
+              "h265",
+              "vp9",
+              "av1"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "presets": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "audio": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bitrate_kbps": {
+                      "description": "Audio bitrate in kbps.",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": "integer"
+                    },
+                    "channels": {
+                      "description": "Channel count. Omit to keep the source's.",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "codec": {
+                      "description": "Audio codec: aac (default), opus, mp3, or flac.",
+                      "type": "string"
+                    },
+                    "normalize": {
+                      "description": "Apply loudness normalization.",
+                      "type": "boolean"
+                    },
+                    "sample_rate": {
+                      "description": "Sample rate in Hz. Omit to keep the source's.",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                },
+                "container": {
+                  "type": "string"
+                },
+                "content_type": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "delivery_format": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "disable_audio": {
+                  "type": "boolean"
+                },
+                "estimated_cost_per_minute": {
+                  "description": "Estimated encoding cost per source minute in EUR, when it can be computed from the preset's settings.",
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "faststart": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "object": {
+                  "type": "string"
+                },
+                "quality_tier": {
+                  "type": "string"
+                },
+                "segment_duration": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "system_preset": {
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "type": "string"
+                },
+                "variants": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bitrate_kbps": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "buffer_size_kbps": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "crf": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "framerate": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "height": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "max_bitrate_kbps": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "quality": {
+                        "description": "Per-rung quality tier override: economy, standard, or premium.",
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "resolution": {
+                        "description": "Resolution for this rung: 480p, 720p, 1080p, 1440p, 2160p, or 4320p.",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "resolution"
+                    ],
+                    "type": "object"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                },
+                "video": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "aq_mode": {
+                      "description": "Adaptive quantization mode (0-3).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "aq_strength": {
+                      "description": "Adaptive quantization strength (0.0-3.0).",
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "bframes": {
+                      "description": "Number of B-frames (0-16).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "bitrate_kbps": {
+                      "description": "Target bitrate in kbps for cbr/vbr (100-100000).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "bitrate_mode": {
+                      "description": "Rate control: crf (quality-targeted), vbr, or cbr.",
+                      "type": "string"
+                    },
+                    "buffer_size_kbps": {
+                      "description": "VBV buffer size in kbps (100-480000).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "codec": {
+                      "description": "Video codec: h264 (default), h265, vp9, or av1.",
+                      "type": "string"
+                    },
+                    "crf": {
+                      "description": "Constant Rate Factor; lower is higher quality and larger files. 15-35 for h264, 18-35 for h265, 15-50 for vp9, 20-55 for av1.",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "deblock": {
+                      "description": "Deblocking filter, \"alpha:beta\" (e.g. \"0:0\").",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "encoder_preset": {
+                      "description": "Encoder speed preset. h264/h265: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower. av1: \"3\"-\"12\".",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "framerate": {
+                      "description": "Target frame rate (0 = keep the source's, max 240).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "height": {
+                      "description": "Custom output height in pixels (128-4320).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "keyint": {
+                      "description": "GOP size in frames (1-600).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "level": {
+                      "description": "Codec level, e.g. \"3.0\", \"4.0\", \"5.1\".",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "max_bitrate_kbps": {
+                      "description": "VBV maximum bitrate in kbps (100-240000).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "min_keyint": {
+                      "description": "Minimum keyframe interval (1-60).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "profile": {
+                      "description": "Codec profile: baseline, main or high for h264; main or main10 for h265.",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "psy_rd": {
+                      "description": "Psychovisual rate-distortion, \"strength:trellis\" (e.g. \"1.0:0.0\").",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "rc_lookahead": {
+                      "description": "Rate-control lookahead frames (0-250).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "refs": {
+                      "description": "Number of reference frames (1-16).",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    },
+                    "resolution": {
+                      "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution. Use this OR width+height.",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "tune": {
+                      "description": "Content-aware tuning. h264: film, animation, grain, stillimage, fastdecode. h265: grain, fastdecode.",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "width": {
+                      "description": "Custom output width in pixels (128-7680). Use with height for non-standard aspect ratios.",
+                      "maximum": 2147483647,
+                      "minimum": -2147483648,
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "id",
+                "object",
+                "slug",
+                "name",
+                "container",
+                "faststart",
+                "delivery_format",
+                "video",
+                "audio",
+                "disable_audio",
+                "quality_tier",
+                "system_preset",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "total_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "presets",
+          "total_count"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_spend_limit",
+      "title": "Set spend limit",
+      "description": "Set or clear this app's monthly transcoding spend limit, in EUR. Requires an organization owner or admin signed in through the browser; API-key sessions cannot change it. Pass monthly_spend_limit_eur to set a limit (greater than 0), or clear: true to remove this app's own limit — one or the other, never both and never neither. Returns the previous and the new EFFECTIVE limit with the rung it comes from, plus the current period's spend: a limit set above a plan or platform ceiling stores fine and changes nothing, because the lower ceiling still binds. Lowering the limit below the period's spend blocks the NEXT job; jobs already queued or running are never stopped.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clear": {
+            "description": "Set true to remove this app's own spend limit. A plan or platform ceiling, if one applies, still binds. Supply this OR monthly_spend_limit_eur, never both.",
+            "type": "boolean"
+          },
+          "monthly_spend_limit_eur": {
+            "description": "New monthly transcoding spend limit for this app, in EUR. Must be greater than 0. Supply this OR clear, never both.",
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "current": {
+            "additionalProperties": false,
+            "properties": {
+              "limit_eur": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "limit_source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "limit_source"
             ],
             "type": "object"
           },
-          "type": [
-            "null",
-            "array"
-          ]
+          "note": {
+            "type": "string"
+          },
+          "period_end": {
+            "type": "string"
+          },
+          "period_start": {
+            "type": "string"
+          },
+          "previous": {
+            "additionalProperties": false,
+            "properties": {
+              "limit_eur": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "limit_source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "limit_source"
+            ],
+            "type": "object"
+          },
+          "spent_eur": {
+            "type": "number"
+          }
         },
-        "next_cursor": {
-          "type": "string"
-        },
-        "total_count": {
-          "type": "integer"
-        }
+        "required": [
+          "app_id",
+          "previous",
+          "current",
+          "spent_eur",
+          "currency",
+          "period_start",
+          "period_end"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "update_preset",
+      "title": "Update preset",
+      "description": "Update a custom preset's settings by id (pst_...). Only the fields you supply change; the rest keep their current values, and a setting inside video or audio cannot be cleared through this tool, only replaced. Supplying variants replaces the whole ABR ladder. System presets are read-only and are refused. Running and queued jobs are NOT affected — a job resolves its preset when it is created, so an edit only reaches jobs created after it.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
-      "required": [
-        "jobs",
-        "total_count"
-      ],
-      "type": "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "additionalProperties": false,
+            "description": "Audio settings to change. Fields you omit inside this object keep their current value.",
+            "properties": {
+              "bitrate_kbps": {
+                "description": "Audio bitrate in kbps.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "channels": {
+                "description": "Channel count. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Audio codec: aac (default), opus, mp3, or flac.",
+                "enum": [
+                  "aac",
+                  "opus",
+                  "mp3",
+                  "flac"
+                ],
+                "type": "string"
+              },
+              "normalize": {
+                "description": "Apply loudness normalization.",
+                "type": "boolean"
+              },
+              "sample_rate": {
+                "description": "Sample rate in Hz. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "container": {
+            "enum": [
+              "mp4",
+              "webm",
+              "mkv",
+              "mov"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "content_type": {
+            "enum": [
+              "film",
+              "animation",
+              "grain",
+              "gaming",
+              "sports",
+              "stillimage"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "delivery_format": {
+            "enum": [
+              "progressive",
+              "hls",
+              "dash",
+              "cmaf"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "description": "New description (up to 1024 characters).",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disable_audio": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "faststart": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "id": {
+            "description": "Preset to update (pst_...). System presets are read-only.",
+            "type": "string"
+          },
+          "name": {
+            "description": "New name (1-128 characters).",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quality_tier": {
+            "enum": [
+              "economy",
+              "standard",
+              "premium"
+            ],
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "segment_duration": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "slug": {
+            "description": "New slug. Lowercase letters, digits and underscores only, 3-64 characters.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "variants": {
+            "description": "Replaces the whole ABR ladder (up to 20 rungs). Omit to leave it unchanged.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "buffer_size_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "crf": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "framerate": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "max_bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "quality": {
+                  "description": "Per-rung quality tier override: economy, standard, or premium.",
+                  "enum": [
+                    "economy",
+                    "standard",
+                    "premium"
+                  ],
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "resolution": {
+                  "description": "Resolution for this rung: 480p, 720p, 1080p, 1440p, 2160p, or 4320p.",
+                  "enum": [
+                    "480p",
+                    "720p",
+                    "1080p",
+                    "1440p",
+                    "2160p",
+                    "4320p"
+                  ],
+                  "type": "string"
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "resolution"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "video": {
+            "additionalProperties": false,
+            "description": "Video settings to change. Fields you omit inside this object keep their current value; a setting cannot be cleared through this tool, only replaced.",
+            "properties": {
+              "aq_mode": {
+                "description": "Adaptive quantization mode (0-3).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "aq_strength": {
+                "description": "Adaptive quantization strength (0.0-3.0).",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "bframes": {
+                "description": "Number of B-frames (0-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_kbps": {
+                "description": "Target bitrate in kbps for cbr/vbr (100-100000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_mode": {
+                "description": "Rate control: crf (quality-targeted), vbr, or cbr.",
+                "enum": [
+                  "crf",
+                  "cbr",
+                  "vbr"
+                ],
+                "type": "string"
+              },
+              "buffer_size_kbps": {
+                "description": "VBV buffer size in kbps (100-480000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Video codec: h264 (default), h265, vp9, or av1.",
+                "enum": [
+                  "h264",
+                  "h265",
+                  "vp9",
+                  "av1"
+                ],
+                "type": "string"
+              },
+              "crf": {
+                "description": "Constant Rate Factor; lower is higher quality and larger files. 15-35 for h264, 18-35 for h265, 15-50 for vp9, 20-55 for av1.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "deblock": {
+                "description": "Deblocking filter, \"alpha:beta\" (e.g. \"0:0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "encoder_preset": {
+                "description": "Encoder speed preset. h264/h265: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower. av1: \"3\"-\"12\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "framerate": {
+                "description": "Target frame rate (0 = keep the source's, max 240).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "height": {
+                "description": "Custom output height in pixels (128-4320).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "keyint": {
+                "description": "GOP size in frames (1-600).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "level": {
+                "description": "Codec level, e.g. \"3.0\", \"4.0\", \"5.1\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "max_bitrate_kbps": {
+                "description": "VBV maximum bitrate in kbps (100-240000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "min_keyint": {
+                "description": "Minimum keyframe interval (1-60).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "profile": {
+                "description": "Codec profile: baseline, main or high for h264; main or main10 for h265.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "psy_rd": {
+                "description": "Psychovisual rate-distortion, \"strength:trellis\" (e.g. \"1.0:0.0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "rc_lookahead": {
+                "description": "Rate-control lookahead frames (0-250).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "refs": {
+                "description": "Number of reference frames (1-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "resolution": {
+                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution. Use this OR width+height.",
+                "enum": [
+                  "480p",
+                  "720p",
+                  "1080p",
+                  "1440p",
+                  "2160p",
+                  "4320p"
+                ],
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "tune": {
+                "description": "Content-aware tuning. h264: film, animation, grain, stillimage, fastdecode. h265: grain, fastdecode.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "width": {
+                "description": "Custom output width in pixels (128-7680). Use with height for non-standard aspect ratios.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "additionalProperties": false,
+            "properties": {
+              "bitrate_kbps": {
+                "description": "Audio bitrate in kbps.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "channels": {
+                "description": "Channel count. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Audio codec: aac (default), opus, mp3, or flac.",
+                "type": "string"
+              },
+              "normalize": {
+                "description": "Apply loudness normalization.",
+                "type": "boolean"
+              },
+              "sample_rate": {
+                "description": "Sample rate in Hz. Omit to keep the source's.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "container": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "delivery_format": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "disable_audio": {
+            "type": "boolean"
+          },
+          "estimated_cost_per_minute": {
+            "description": "Estimated encoding cost per source minute in EUR, when it can be computed from the preset's settings.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "faststart": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "quality_tier": {
+            "type": "string"
+          },
+          "segment_duration": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "system_preset": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "buffer_size_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "crf": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "framerate": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "height": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "max_bitrate_kbps": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "quality": {
+                  "description": "Per-rung quality tier override: economy, standard, or premium.",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "resolution": {
+                  "description": "Resolution for this rung: 480p, 720p, 1080p, 1440p, 2160p, or 4320p.",
+                  "type": "string"
+                },
+                "width": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "required": [
+                "resolution"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "video": {
+            "additionalProperties": false,
+            "properties": {
+              "aq_mode": {
+                "description": "Adaptive quantization mode (0-3).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "aq_strength": {
+                "description": "Adaptive quantization strength (0.0-3.0).",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "bframes": {
+                "description": "Number of B-frames (0-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_kbps": {
+                "description": "Target bitrate in kbps for cbr/vbr (100-100000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "bitrate_mode": {
+                "description": "Rate control: crf (quality-targeted), vbr, or cbr.",
+                "type": "string"
+              },
+              "buffer_size_kbps": {
+                "description": "VBV buffer size in kbps (100-480000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "codec": {
+                "description": "Video codec: h264 (default), h265, vp9, or av1.",
+                "type": "string"
+              },
+              "crf": {
+                "description": "Constant Rate Factor; lower is higher quality and larger files. 15-35 for h264, 18-35 for h265, 15-50 for vp9, 20-55 for av1.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "deblock": {
+                "description": "Deblocking filter, \"alpha:beta\" (e.g. \"0:0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "encoder_preset": {
+                "description": "Encoder speed preset. h264/h265: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower. av1: \"3\"-\"12\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "framerate": {
+                "description": "Target frame rate (0 = keep the source's, max 240).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "height": {
+                "description": "Custom output height in pixels (128-4320).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "keyint": {
+                "description": "GOP size in frames (1-600).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "level": {
+                "description": "Codec level, e.g. \"3.0\", \"4.0\", \"5.1\".",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "max_bitrate_kbps": {
+                "description": "VBV maximum bitrate in kbps (100-240000).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "min_keyint": {
+                "description": "Minimum keyframe interval (1-60).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "profile": {
+                "description": "Codec profile: baseline, main or high for h264; main or main10 for h265.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "psy_rd": {
+                "description": "Psychovisual rate-distortion, \"strength:trellis\" (e.g. \"1.0:0.0\").",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "rc_lookahead": {
+                "description": "Rate-control lookahead frames (0-250).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "refs": {
+                "description": "Number of reference frames (1-16).",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "resolution": {
+                "description": "Target resolution: 480p, 720p, 1080p, 1440p, 2160p, or 4320p. Omit to keep the source resolution. Use this OR width+height.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "tune": {
+                "description": "Content-aware tuning. h264: film, animation, grain, stillimage, fastdecode. h265: grain, fastdecode.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "width": {
+                "description": "Custom output width in pixels (128-7680). Use with height for non-standard aspect ratios.",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "slug",
+          "name",
+          "container",
+          "faststart",
+          "delivery_format",
+          "video",
+          "audio",
+          "disable_audio",
+          "quality_tier",
+          "system_preset",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      }
     }
-  }
-]
+  ]
+}
