@@ -4,10 +4,9 @@
     "`command` run in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs",
     "re-runs it and refuses any difference.",
     "",
-    "`ref` is a requirement, not a record of what exists. At the time of writing the",
-    "latest api tag is v5.19.0 and v5.20.0 has NOT been cut; the parity job will fail",
-    "loudly on the clone until it is, which is the intended behaviour. Correct `ref` to",
-    "whatever tag actually ships the fifteen-tool surface before publishing.",
+    "v5.27.0 exports the nineteen-tool surface (adds generate_insights, get_pricing,",
+    "get_seo_markup, get_transcript); its export was byte-identical to api",
+    "origin/master when this pin was set.",
     "",
     "Re-vendoring must read a DETACHED WORKTREE at that tag, never the shared api",
     "checkout, which other sessions commit to and which sits on master:",
@@ -17,6 +16,6 @@
     "itself — the only mode that verifies the pin."
   ],
   "repository": "https://github.com/transcodely/api.git",
-  "ref": "v5.20.0",
+  "ref": "v5.27.0",
   "command": "go run ./cmd/mcp --dump-tools"
 }
