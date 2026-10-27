@@ -39,9 +39,9 @@ Then run `/mcp` inside Claude Code and pick **Authenticate** — your browser op
 Any other client that supports remote MCP servers over streamable HTTP works the same way. For headless use (CI, server-side agents), attach a Transcodely API key as a bearer token instead — see the [connect guide](https://www.transcodely.com/docs/guides/mcp).
 
 <!-- BEGIN GENERATED TOOLS — npm run readme:gen -->
-## Tools (15)
+## Tools (19)
 
-Fifteen tools: nine only read, four create something — three of those start work you are billed for, and saving a preset is free — and two overwrite a setting that only affects work created after it. No tool on this surface deletes, cancels, removes or rotates anything.
+Nineteen tools: twelve only read, five create something — four of those start work you are billed for, and saving a preset is free — and two overwrite a setting that only affects work created after it. No tool on this surface deletes, cancels, removes or rotates anything.
 
 | Tool | Effect | What it does |
 |---|---|---|
@@ -49,9 +49,13 @@ Fifteen tools: nine only read, four create something — three of those start wo
 | `create_preset` | creates · free | Create a custom encoding preset for this app: a named, reusable bundle of encoding settings that create_job can reference by slug. |
 | `create_video_from_url` | creates work · billable | Ingest a remote https:// video and host it in one call — this is the tool for "transcode and host this, give me a link". |
 | `generate_captions` | creates work · billable | Generate AI captions (subtitles) for a hosted video by id (vid_...). |
+| `generate_insights` | creates work · billable | Generate AI insights (title suggestions, summary, key points, chapters, questions, key terms, quotable highlights, topics) for a hosted video by id (vid_...) from its existing AI captions; nothing is re-transcribed. |
 | `get_ingest_rule` | read | Fetch one ingest rule by id (ing_...): its origin, enabled state, filters, the job it submits, and its event/job counts. |
 | `get_job_status` | read | Get a concise status snapshot for a transcoding job by id (job_...): overall status and progress, any error code/message, and per-output status/progress with errors. |
 | `get_output_report` | read | Get the full measurement report for one job output (job_... plus out_...): what the produced file turned out to BE, measured from the written file, and the verdict of comparing that against what the job asked for. |
+| `get_pricing` | read | Return the prices this app pays, in EUR: every chargeable item (encoding per codec, the resolution, quality and feature multipliers, the captions, insights and processing fees, hosting storage and delivery) with its rate and unit, custom: true where this account has a custom rate, and the public list price beside it. |
+| `get_seo_markup` | read | Get ready-to-paste SEO markup for showing a hosted video (vid_..., ready, public or unlisted) on your own web page at watch_url: schema.org VideoObject JSON-LD (with chapter key moments when the video has insights), a video sitemap entry, and an escaped HTML fragment with the summary, chapter links and full transcript. watch_url is only embedded in the output, never fetched. |
+| `get_transcript` | read | Get the transcript of a hosted video (vid_...) produced by its AI captions, as txt (plain text, the default), md (Markdown with timestamp links) or json (paragraphs, sentences and words with timings). |
 | `get_usage` | read | Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. |
 | `get_video` | read | Fetch a hosted video by id (vid_...): status, visibility, title, duration, poster image, encoded renditions (resolution, codec, bitrate, dimensions), and — once status is "ready" — a playback block. |
 | `list_ingest_events` | read | List the storage deliveries this app's ingest rules received, newest first, with what became of each: the bucket and object key, the outcome (received, matched, created, skipped or failed), the REASON for a skip or failure, and the job id when one was created. |
@@ -61,7 +65,7 @@ Fifteen tools: nine only read, four create something — three of those start wo
 | `set_spend_limit` | overwrites a setting | Set or clear this app's monthly transcoding spend limit, in EUR. |
 | `update_preset` | overwrites a setting | Update a custom preset's settings by id (pst_...). |
 
-*Generated from [`tools.json`](./tools.json) by `npm run readme:gen` — do not edit by hand. Read-only: 9. Writing: 6. Billable: 3.*
+*Generated from [`tools.json`](./tools.json) by `npm run readme:gen` — do not edit by hand. Read-only: 12. Writing: 7. Billable: 4.*
 <!-- END GENERATED TOOLS -->
 
 ## What the surface cannot do
@@ -87,7 +91,7 @@ The promise is narrow and literal, and it is checked rather than asserted: `test
 - **Every tool call is scoped to one Transcodely app**, resolved from the session, never from a tool argument. An agent cannot widen its own scope by passing a different id: a job, video, preset or rule belonging to another app reads back as *not found* rather than as a permission error, which would confirm it exists. Connect to `https://mcp.transcodely.com/mcp/app_…` to pin a specific app; the bare URL resolves to your organization's oldest active app.
 - An `ak_…` key presented at a different app's URL is rejected outright.
 - Every call writes the same audit trail as the equivalent REST call.
-- The MCP server is free to connect. Three tools start billable work — `create_job`, `create_video_from_url` and `generate_captions` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing.
+- The MCP server is free to connect. Four tools start billable work — `create_job`, `create_video_from_url`, `generate_captions` and `generate_insights` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing.
 
 ## Try it
 

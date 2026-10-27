@@ -36,6 +36,30 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "content_aware": {
+                  "additionalProperties": false,
+                  "description": "Content-aware encoding for this output. Billed at 1.5x, and the search needs a source of at least two minutes. Omit it for the quality tier's fixed settings, which is what almost every output wants.",
+                  "properties": {
+                    "mode": {
+                      "description": "Must be per_title: the encoder searches for the CRF this particular source needs to hit vmaf_target, instead of using the tier's fixed one. auto_abr is not available yet and is rejected.",
+                      "type": "string"
+                    },
+                    "vmaf_target": {
+                      "description": "Quality to search for, 80-97. Defaults to 93. Higher targets mean bigger files.",
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ],
+                  "type": [
+                    "null",
+                    "object"
+                  ]
+                },
                 "format": {
                   "description": "Container or packaging format: mp4, webm, mkv, mov, hls, dash, or adaptive.",
                   "type": "string"
@@ -1010,7 +1034,7 @@
     {
       "name": "create_video_from_url",
       "title": "Ingest and host video",
-      "description": "Ingest a remote https:// video and host it in one call — this is the tool for \"transcode and host this, give me a link\". Downloads the URL, transcodes it into an adaptive streaming ladder, and returns a hosted video (vid_...) with status \"processing\". The URL must be publicly reachable over http(s); private/internal targets are rejected (SSRF protection). Visibility follows the app's hosting default, \"unlisted\" when the app has not set one (playable by anyone with the link, not listed publicly). Enables managed hosting for the app on first use — a one-way change, after which hosted storage and egress bill at the standard rates. To finish the job: poll get_video with the returned id every ~10s until status is \"ready\" (typically under a few minutes for a short clip), then give the user playback.player_url — that is the durable, clickable link.",
+      "description": "Ingest a remote https:// video and host it in one call — this is the tool for \"transcode and host this, give me a link\". Downloads the URL, transcodes it into an adaptive streaming ladder, and returns a hosted video (vid_...) with status \"processing\". The URL must be publicly reachable over http(s); private/internal targets are rejected (SSRF protection). Visibility follows the app's hosting default, \"unlisted\" when the app has not set one (playable by anyone with the link, not listed publicly). Enables managed hosting for the app on first use — a one-way change, after which hosted storage and egress bill at the standard rates. Set auto_captions: true to caption it in the same job (billed per source minute), and auto_insights: true as well for AI insights over those captions (EUR 0.02 per video + EUR 0.005 per source minute). To finish the job: poll get_video with the returned id every ~10s until status is \"ready\" (typically under a few minutes for a short clip), then give the user playback.player_url — that is the durable, clickable link.",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false,
@@ -1020,6 +1044,14 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "auto_captions": {
+            "description": "Also generate AI captions (WebVTT, language auto-detected) in the same job as the transcode. EUR 0.05 per source minute, only when a caption track is delivered.",
+            "type": "boolean"
+          },
+          "auto_insights": {
+            "description": "Also produce AI insights over those captions (summary, chapters, key points, topics); requires auto_captions. EUR 0.02 per video + EUR 0.005 per source minute, only when produced.",
+            "type": "boolean"
+          },
           "description": {
             "description": "Longer description for the hosted video.",
             "type": "string"
@@ -1222,7 +1254,7 @@
     {
       "name": "generate_captions",
       "title": "Generate AI captions",
-      "description": "Generate AI captions (subtitles) for a hosted video by id (vid_...). Creates a billable captions job: speech is transcribed into a WebVTT subtitle track in the given language (default \"auto\" to detect the spoken language), attached to the video when the job completes. Billed per source minute; the fee is only charged when a caption track is actually delivered. Idempotent per video+language: repeating the call returns the existing job instead of creating and billing a new one.",
+      "description": "Generate AI captions (subtitles) for a hosted video by id (vid_...). Creates a billable captions job: speech is transcribed into a WebVTT subtitle track in the given language (default \"auto\" to detect the spoken language), attached to the video when the job completes. Billed per source minute; the fee is only charged when a caption track is actually delivered. Idempotent per video+language: repeating the call returns the existing job instead of creating and billing a new one. Set insights: true to also get AI insights over the transcript (title suggestions, summary, key points, chapters, questions, key terms, quotable highlights, topics), billed as a separate per-video + per-minute fee and only when produced; the transcript text is processed by Anthropic. Insights arrive after the captions — poll get_job_status or get_video.",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false,
@@ -1232,6 +1264,14 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "insights": {
+            "description": "Also produce AI insights over the transcript (summary, chapters, key points, questions, terms, highlights, topics). Separately billed, only when produced. Refused on deployments without the feature.",
+            "type": "boolean"
+          },
+          "insights_hint": {
+            "description": "Optional guidance for the insights about audience, tone or content type, at most 300 characters (e.g. \"Beginner cooking class\").",
+            "type": "string"
+          },
           "language": {
             "description": "ISO 639-2 language code for the captions (e.g. eng, spa, bul). Defaults to \"auto\" to detect the spoken language.",
             "type": "string"
@@ -1249,7 +1289,68 @@
       "outputSchema": {
         "additionalProperties": false,
         "properties": {
+          "insights": {
+            "description": "True when AI insights were requested; they arrive after the captions.",
+            "type": "boolean"
+          },
           "job_id": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "video_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "name": "generate_insights",
+      "title": "Generate AI insights",
+      "description": "Generate AI insights (title suggestions, summary, key points, chapters, questions, key terms, quotable highlights, topics) for a hosted video by id (vid_...) from its existing AI captions; nothing is re-transcribed. EUR 0.02 per video + EUR 0.005 per source minute, charged only when the insights are ready. Pass language when the video has captions in several languages. Idempotent while pending: repeating the call returns the pending entry without billing again; once it is ready or failed, a new call regenerates (billed again). A video without captions is refused: run generate_captions first. The transcript text is processed by Anthropic. Poll get_video until the entry's status is \"ready\".",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "hint": {
+            "description": "Optional guidance about audience, tone or content type, at most 300 characters (e.g. \"Beginner cooking class\").",
+            "type": "string"
+          },
+          "language": {
+            "description": "ISO 639-2 language of the caption track to use (e.g. eng). Needed only when the video has captions in several languages.",
+            "type": "string"
+          },
+          "video_id": {
+            "description": "Hosted video id (vid_...) whose existing AI captions to use.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fee_eur": {
+            "description": "Price in EUR, charged only when the insights become ready.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "insights_id": {
             "type": "string"
           },
           "language": {
@@ -1562,10 +1663,87 @@
             "additionalProperties": false,
             "description": "Content-aware encoding this output requested, when it requested any.",
             "properties": {
+              "analysis": {
+                "additionalProperties": false,
+                "description": "What the per-title search decided, once it has reported. Absent means no search has reported for this output.",
+                "properties": {
+                  "crf_chosen": {
+                    "description": "The CRF the search settled on, for the highest-resolution rendition. Lower rungs derive from it by the ladder's fixed offsets.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "met_target": {
+                    "description": "Whether the search reached vmaf_target. False means crf_chosen is the best of a set that all fell short.",
+                    "type": [
+                      "null",
+                      "boolean"
+                    ]
+                  },
+                  "probes": {
+                    "description": "Every sample the search measured, in the order it measured them. Empty for a job encoded before the worker reported its curve.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bitrate_kbps": {
+                          "description": "Bitrate of the encoded SAMPLE. Two probes compare directly; neither is the delivered file's bitrate. Absent when the encoder did not report the sample's size.",
+                          "type": [
+                            "null",
+                            "number"
+                          ]
+                        },
+                        "crf": {
+                          "type": "integer"
+                        },
+                        "vmaf": {
+                          "description": "Score the sample got against the untouched original, 0-100.",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "crf",
+                        "vmaf"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "seed_crf": {
+                    "description": "The CRF this rendition would have used WITHOUT the search: the quality tier's static value, and the first point measured. Compare with crf_chosen to see what per-title changed.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "vmaf_achieved": {
+                    "description": "What the chosen setting scored ON THE SAMPLES. The delivered file is never scored.",
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "vmaf_target": {
+                    "description": "The target the search aimed at, after the worker clamped the request into the range it can search.",
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
               "mode": {
                 "type": "string"
               },
               "vmaf_target": {
+                "description": "VMAF target the output asked for. What the search aimed at after clamping is analysis.vmaf_target.",
                 "type": [
                   "null",
                   "number"
@@ -1767,6 +1945,216 @@
           "status",
           "format",
           "measured"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_pricing",
+      "title": "Get prices",
+      "description": "Return the prices this app pays, in EUR: every chargeable item (encoding per codec, the resolution, quality and feature multipliers, the captions, insights and processing fees, hosting storage and delivery) with its rate and unit, custom: true where this account has a custom rate, and the public list price beside it. Encoding cost per output is the codec's base_price x output minutes x the codec, resolution, quality, feature and frame-rate multipliers. Prices are fixed when work is created, so a change applies to jobs created after it.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "base_price": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "custom": {
+                  "type": "boolean"
+                },
+                "group_label": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "list_base_price": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "list_multiplier": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "multiplier": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "rule_key": {
+                  "type": "string"
+                },
+                "rule_type": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "rule_type",
+                "rule_key",
+                "label",
+                "group_label",
+                "custom"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "app_id",
+          "currency",
+          "entries"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_seo_markup",
+      "title": "Get SEO markup",
+      "description": "Get ready-to-paste SEO markup for showing a hosted video (vid_..., ready, public or unlisted) on your own web page at watch_url: schema.org VideoObject JSON-LD (with chapter key moments when the video has insights), a video sitemap entry, and an escaped HTML fragment with the summary, chapter links and full transcript. watch_url is only embedded in the output, never fetched.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deep_link_param": {
+            "description": "Query parameter your page reads to start playback at a time in seconds. Default: t (links like ?t=95).",
+            "type": "string"
+          },
+          "language": {
+            "description": "ISO 639-2 language of the transcript and insights to use. Omit for the video's first transcript.",
+            "type": "string"
+          },
+          "video_id": {
+            "description": "Hosted video id (vid_...). Must be ready and public or unlisted.",
+            "type": "string"
+          },
+          "watch_url": {
+            "description": "Absolute https:// URL of YOUR page that shows the video. Only embedded in the returned markup (sitemap location and chapter deep links); never fetched.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id",
+          "watch_url"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "html_fragment": {
+            "description": "Escaped semantic HTML: summary, key points, chapter links and the transcript inside \u003cdetails\u003e.",
+            "type": "string"
+          },
+          "json_ld": {
+            "description": "schema.org VideoObject JSON-LD to place inside \u003cscript type=\"application/ld+json\"\u003e.",
+            "type": "string"
+          },
+          "sitemap_entry": {
+            "description": "A \u003curl\u003e entry for a video sitemap.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "json_ld",
+          "sitemap_entry",
+          "html_fragment"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_transcript",
+      "title": "Get transcript",
+      "description": "Get the transcript of a hosted video (vid_...) produced by its AI captions, as txt (plain text, the default), md (Markdown with timestamp links) or json (paragraphs, sentences and words with timings). Returns the text inline when it is 64 KiB or smaller, otherwise a short-lived signed download URL. A video without generated captions has no transcript: run generate_captions first.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "description": "Transcript rendition: txt (plain text, default), md (Markdown with timestamp links) or json (paragraphs, sentences and words with millisecond timings).",
+            "type": "string"
+          },
+          "language": {
+            "description": "ISO 639-2 language of the transcript (e.g. eng). Omit for the video's first generated transcript.",
+            "type": "string"
+          },
+          "video_id": {
+            "description": "Hosted video id (vid_...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "description": "The transcript text, when it is 64 KiB or smaller.",
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "url": {
+            "description": "Signed, short-lived download URL, returned instead of content when the transcript is larger than 64 KiB (or cannot be read inline). Fetch it promptly; call get_transcript again for a fresh one.",
+            "type": "string"
+          },
+          "video_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id",
+          "language",
+          "format"
         ],
         "type": "object"
       }

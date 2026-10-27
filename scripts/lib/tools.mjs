@@ -45,9 +45,13 @@ export function readPin() {
  * as "billed" published `create_preset` as billable on four public surfaces,
  * which is false — saving a preset writes a config row and nothing else.
  *
- * Verified against the api's charge path: each of these three reaches
+ * Verified against the api's charge path: the first three reach
  * `Jobs.Create` (`internal/mcpserver/tools_jobs.go:92`,
- * `tools_videos.go:75` via `Videos.CreateFromUrl`, and `tools_videos.go:216`).
+ * `tools_videos.go:75` via `Videos.CreateFromUrl`, and `tools_videos.go:216`);
+ * `generate_insights` reaches `Videos.GenerateInsights`
+ * (`tools_videos.go:288`), which fixes the two insights fees on the row and
+ * settles them to the ledger when the pass is ready
+ * (`internal/services/videos/insights.go`).
  * `internal/services/presets/` has no ledger, charge or invoice reference —
  * only a cost ESTIMATOR that computes a display figure for a future job.
  *
@@ -58,6 +62,7 @@ export const BILLABLE = new Set([
 	"create_job",
 	"create_video_from_url",
 	"generate_captions",
+	"generate_insights",
 ]);
 
 /** Whether calling this tool costs money. Never inferred from annotations. */
