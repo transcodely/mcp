@@ -4,9 +4,10 @@
     "`command` run in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs",
     "re-runs it and refuses any difference.",
     "",
-    "v5.27.0 exports the nineteen-tool surface (adds generate_insights, get_pricing,",
-    "get_seo_markup, get_transcript); its export was byte-identical to api",
-    "origin/master when this pin was set.",
+    "v5.29.0 exports the nineteen-tool surface with create_job's content_aware",
+    "describing auto_abr as accepted, and get_usage's hosting_estimated_from. The",
+    "export was taken from api 540030fc (origin/master) before v5.29.0 was cut;",
+    "confirm the tag contains it before relying on the parity check.",
     "",
     "Re-vendoring must read a DETACHED WORKTREE at that tag, never the shared api",
     "checkout, which other sessions commit to and which sits on master:",
@@ -16,6 +17,6 @@
     "itself — the only mode that verifies the pin."
   ],
   "repository": "https://github.com/transcodely/api.git",
-  "ref": "v5.27.0",
+  "ref": "v5.29.0",
   "command": "go run ./cmd/mcp --dump-tools"
 }
