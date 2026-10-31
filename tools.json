@@ -38,10 +38,10 @@
               "properties": {
                 "content_aware": {
                   "additionalProperties": false,
-                  "description": "Content-aware encoding for this output. Billed at 1.5x, and the search needs a source of at least two minutes. Omit it for the quality tier's fixed settings, which is what almost every output wants.",
+                  "description": "Content-aware encoding for this output, billed at 1.5x when the analysis shapes the encode. per_title needs a source of at least two minutes and is refused below that; auto_abr on a shorter source renders its whole ladder at 1.0x instead. Omit it for the quality tier's fixed settings, which is what almost every output wants.",
                   "properties": {
                     "mode": {
-                      "description": "Must be per_title: the encoder searches for the CRF this particular source needs to hit vmaf_target, instead of using the tier's fixed one. auto_abr is not available yet and is rejected.",
+                      "description": "per_title or auto_abr. per_title: the encoder searches for the CRF this particular source needs to hit vmaf_target, instead of using the tier's fixed one, on the rendition you declared. auto_abr (format hls, dash or adaptive only): the API builds a ladder of standard rungs from 480p up to 1080p, never above the source, and the encoder keeps the rungs the content needs; resolution is ignored, and you are billed only for the rungs rendered. This tool sends no ladder bounds, so those defaults apply.",
                       "type": "string"
                     },
                     "vmaf_target": {
@@ -2162,7 +2162,7 @@
     {
       "name": "get_usage",
       "title": "Get usage and cost",
-      "description": "Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. Defaults to the current month; pass month as \"YYYY-MM\" for a specific period.",
+      "description": "Return hosting usage and cost for a billing month: videos encoded, encoding minutes, average storage, egress, request counts, and per-line and total cost in EUR. Storage and egress cost are what was billed for days already billed, plus an estimate at the current rate from hosting_estimated_from on. Defaults to the current month; pass month as \"YYYY-MM\" for a specific period.",
       "annotations": {
         "readOnlyHint": true,
         "idempotentHint": false,
@@ -2233,6 +2233,9 @@
           "encoding_minutes": {
             "type": "number"
           },
+          "hosting_estimated_from": {
+            "type": "string"
+          },
           "storage_cost": {
             "type": "number"
           },
@@ -2269,7 +2272,8 @@
           "egress_cost",
           "total_requests",
           "total_cost",
-          "daily"
+          "daily",
+          "hosting_estimated_from"
         ],
         "type": "object"
       }
