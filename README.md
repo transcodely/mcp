@@ -39,9 +39,9 @@ Then run `/mcp` inside Claude Code and pick **Authenticate** — your browser op
 Any other client that supports remote MCP servers over streamable HTTP works the same way. For headless use (CI, server-side agents), attach a Transcodely API key as a bearer token instead — see the [connect guide](https://www.transcodely.com/docs/guides/mcp).
 
 <!-- BEGIN GENERATED TOOLS — npm run readme:gen -->
-## Tools (19)
+## Tools (20)
 
-Nineteen tools: twelve only read, five create something — four of those start work you are billed for, and saving a preset is free — and two overwrite a setting that only affects work created after it. No tool on this surface deletes, cancels, removes or rotates anything.
+Twenty tools: twelve only read, six create something — five of those start work you are billed for, and saving a preset is free — and two overwrite a setting that only affects work created after it. No tool on this surface deletes, cancels, removes or rotates anything.
 
 | Tool | Effect | What it does |
 |---|---|---|
@@ -49,6 +49,7 @@ Nineteen tools: twelve only read, five create something — four of those start 
 | `create_preset` | creates · free | Create a custom encoding preset for this app: a named, reusable bundle of encoding settings that create_job can reference by slug. |
 | `create_video_from_url` | creates work · billable | Ingest a remote https:// video and host it in one call — this is the tool for "transcode and host this, give me a link". |
 | `generate_captions` | creates work · billable | Generate AI captions (subtitles) for a hosted video by id (vid_...). |
+| `generate_highlights` | creates work · billable | Cut short highlight clips (MP4) from a hosted video by id (vid_...) around the quotable moments its ready AI insights picked. |
 | `generate_insights` | creates work · billable | Generate AI insights (title suggestions, summary, key points, chapters, questions, key terms, quotable highlights, topics) for a hosted video by id (vid_...) from its existing AI captions; nothing is re-transcribed. |
 | `get_ingest_rule` | read | Fetch one ingest rule by id (ing_...): its origin, enabled state, filters, the job it submits, and its event/job counts. |
 | `get_job_status` | read | Get a concise status snapshot for a transcoding job by id (job_...): overall status and progress, any error code/message, and per-output status/progress with errors. |
@@ -65,7 +66,7 @@ Nineteen tools: twelve only read, five create something — four of those start 
 | `set_spend_limit` | overwrites a setting | Set or clear this app's monthly transcoding spend limit, in EUR. |
 | `update_preset` | overwrites a setting | Update a custom preset's settings by id (pst_...). |
 
-*Generated from [`tools.json`](./tools.json) by `npm run readme:gen` — do not edit by hand. Read-only: 12. Writing: 7. Billable: 4.*
+*Generated from [`tools.json`](./tools.json) by `npm run readme:gen` — do not edit by hand. Read-only: 12. Writing: 8. Billable: 5.*
 <!-- END GENERATED TOOLS -->
 
 ## What the surface cannot do
@@ -91,16 +92,17 @@ The promise is narrow and literal, and it is checked rather than asserted: `test
 - **Every tool call is scoped to one Transcodely app**, resolved from the session, never from a tool argument. An agent cannot widen its own scope by passing a different id: a job, video, preset or rule belonging to another app reads back as *not found* rather than as a permission error, which would confirm it exists. Connect to `https://mcp.transcodely.com/mcp/app_…` to pin a specific app; the bare URL resolves to your organization's oldest active app.
 - An `ak_…` key presented at a different app's URL is rejected outright.
 - Every call writes the same audit trail as the equivalent REST call.
-- The MCP server is free to connect. Four tools start billable work — `create_job`, `create_video_from_url`, `generate_captions` and `generate_insights` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing.
+- The MCP server is free to connect. Five tools start billable work — `create_job`, `create_video_from_url`, `generate_captions`, `generate_insights` and `generate_highlights` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing.
 
 ## Try it
 
 1. *"Transcode and host this video and give me a link: https://www.transcodely.com/videos/bbb-30s.mp4"*
 2. *"Generate English captions for that video."*
-3. *"What's the status of my last job?"*
-4. *"Did that 1080p output actually come out as 1080p h264? Show me the measured report."*
-5. *"I uploaded a file to my bucket and no job appeared — what happened?"*
-6. *"How much have I spent on video this month, and which day cost the most?"*
+3. *"Generate insights for that video, then cut highlight clips from it."*
+4. *"What's the status of my last job?"*
+5. *"Did that 1080p output actually come out as 1080p h264? Show me the measured report."*
+6. *"I uploaded a file to my bucket and no job appeared — what happened?"*
+7. *"How much have I spent on video this month, and which day cost the most?"*
 
 ## Run locally (stdio bridge)
 

@@ -4,10 +4,11 @@
     "`command` run in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs",
     "re-runs it and refuses any difference.",
     "",
-    "v5.29.0 exports the nineteen-tool surface with create_job's content_aware",
-    "describing auto_abr as accepted, and get_usage's hosting_estimated_from. The",
-    "export was taken from api 540030fc (origin/master) before v5.29.0 was cut;",
-    "confirm the tag contains it before relying on the parity check.",
+    "v5.31.0 exports the twenty-tool surface: generate_highlights (new, billable:",
+    "clipped minutes at the encoding rate, no processing fee), get_video's highlights,",
+    "and the reserved transcodely_ metadata prefix on create_job. The export was taken",
+    "from api 6b078796 (feat/video-highlights) before v5.31.0 was cut; confirm the tag",
+    "contains it before relying on the parity check.",
     "",
     "Re-vendoring must read a DETACHED WORKTREE at that tag, never the shared api",
     "checkout, which other sessions commit to and which sits on master:",
@@ -17,6 +18,6 @@
     "itself — the only mode that verifies the pin."
   ],
   "repository": "https://github.com/transcodely/api.git",
-  "ref": "v5.29.0",
+  "ref": "v5.31.0",
   "command": "go run ./cmd/mcp --dump-tools"
 }

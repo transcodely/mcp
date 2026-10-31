@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.transcodely/mcp",
-  "description": "Transcode, host and caption video from a prompt. Nineteen tools, twelve read-only, nothing deletes.",
+  "description": "Transcode, host and caption video from a prompt. Twenty tools, twelve read-only, nothing deletes.",
   "title": "Transcodely",
   "version": "1.2.0",
   "websiteUrl": "https://www.transcodely.com/mcp",
