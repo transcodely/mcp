@@ -24,7 +24,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Arbitrary string key/value pairs echoed back on the job.",
+            "description": "Arbitrary string key/value pairs echoed back on the job. Keys starting with transcodely_ are reserved for the platform and refused.",
             "type": "object"
           },
           "output_origin_id": {
@@ -1112,6 +1112,60 @@
               "number"
             ]
           },
+          "highlights": {
+            "description": "Highlight clips cut from this video (generate_highlights), in video order. Each moves from pending to ready or failed; a ready one carries playback_url, a short MP4.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "duration_seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "end_seconds": {
+                  "type": "number"
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "job_id": {
+                  "description": "The clip job that renders it, billed as its clipped minutes at the encoding rate (no processing fee).",
+                  "type": "string"
+                },
+                "playback_url": {
+                  "description": "Fetchable MP4 URL of the clip, present once ready. Signed and short-lived on a token-auth delivery zone, so fetch a fresh one via get_video rather than storing it.",
+                  "type": "string"
+                },
+                "poster_url": {
+                  "type": "string"
+                },
+                "start_seconds": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "start_seconds",
+                "end_seconds"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -1306,6 +1360,128 @@
             "type": "string"
           }
         },
+        "type": "object"
+      }
+    },
+    {
+      "name": "generate_highlights",
+      "title": "Generate highlight clips",
+      "description": "Cut short highlight clips (MP4) from a hosted video by id (vid_...) around the quotable moments its ready AI insights picked. Up to max_count clips (default 5), each 8 to 60 seconds by default, rendered at the video's top rendition. Each clip is a clip job billed at your encoding rate on its clipped minutes only (no per-job processing fee). Idempotent while pending: repeating the call returns the same clips without billing again; once they finished, a new call replaces them. A video without ready insights is refused with highlights_require_insights: run generate_insights first. Poll get_video until each highlight's status is \"ready\"; its playback_url is the clip.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "description": "ISO 639-2 language of the insights to use (e.g. eng). Needed only when the video has insights in several languages.",
+            "type": "string"
+          },
+          "max_count": {
+            "description": "Maximum number of clips, 1 to 10. Default 5.",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "max_seconds": {
+            "description": "Longest clip in seconds, 1 to 300. Default 60.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "min_seconds": {
+            "description": "Shortest clip in seconds, 1 to 300. Default 8.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "padding_seconds": {
+            "description": "Seconds added before and after each quote so words are not cut, 0 to 10. Default 1.5.",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "video_id": {
+            "description": "Hosted video id (vid_...) with ready AI insights to cut highlights from.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "highlights": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "duration_seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "end_seconds": {
+                  "type": "number"
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "job_id": {
+                  "description": "The clip job that renders it, billed as its clipped minutes at the encoding rate (no processing fee).",
+                  "type": "string"
+                },
+                "playback_url": {
+                  "description": "Fetchable MP4 URL of the clip, present once ready. Signed and short-lived on a token-auth delivery zone, so fetch a fresh one via get_video rather than storing it.",
+                  "type": "string"
+                },
+                "poster_url": {
+                  "type": "string"
+                },
+                "start_seconds": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "start_seconds",
+                "end_seconds"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "video_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id",
+          "highlights"
+        ],
         "type": "object"
       }
     },
@@ -2322,6 +2498,60 @@
             "type": [
               "null",
               "number"
+            ]
+          },
+          "highlights": {
+            "description": "Highlight clips cut from this video (generate_highlights), in video order. Each moves from pending to ready or failed; a ready one carries playback_url, a short MP4.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "duration_seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "end_seconds": {
+                  "type": "number"
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "job_id": {
+                  "description": "The clip job that renders it, billed as its clipped minutes at the encoding rate (no processing fee).",
+                  "type": "string"
+                },
+                "playback_url": {
+                  "description": "Fetchable MP4 URL of the clip, present once ready. Signed and short-lived on a token-auth delivery zone, so fetch a fresh one via get_video rather than storing it.",
+                  "type": "string"
+                },
+                "poster_url": {
+                  "type": "string"
+                },
+                "start_seconds": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "start_seconds",
+                "end_seconds"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
             ]
           },
           "id": {

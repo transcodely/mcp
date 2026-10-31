@@ -51,7 +51,10 @@ export function readPin() {
  * `generate_insights` reaches `Videos.GenerateInsights`
  * (`tools_videos.go:288`), which fixes the two insights fees on the row and
  * settles them to the ledger when the pass is ready
- * (`internal/services/videos/insights.go`).
+ * (`internal/services/videos/insights.go`); `generate_highlights` reaches
+ * `Videos.GenerateHighlights` (`tools_videos.go:383`), which creates one clip
+ * job per highlight through `Jobs.Create`, billed on its clipped minutes at the
+ * encoding rate with no processing fee (`internal/services/videos/highlights.go`).
  * `internal/services/presets/` has no ledger, charge or invoice reference —
  * only a cost ESTIMATOR that computes a display figure for a future job.
  *
@@ -62,6 +65,7 @@ export const BILLABLE = new Set([
 	"create_job",
 	"create_video_from_url",
 	"generate_captions",
+	"generate_highlights",
 	"generate_insights",
 ]);
 
