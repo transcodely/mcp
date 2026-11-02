@@ -92,7 +92,7 @@ The promise is narrow and literal, and it is checked rather than asserted: `test
 - **Every tool call is scoped to one Transcodely app**, resolved from the session, never from a tool argument. An agent cannot widen its own scope by passing a different id: a job, video, preset or rule belonging to another app reads back as *not found* rather than as a permission error, which would confirm it exists. Connect to `https://mcp.transcodely.com/mcp/app_…` to pin a specific app; the bare URL resolves to your organization's oldest active app.
 - An `ak_…` key presented at a different app's URL is rejected outright.
 - Every call writes the same audit trail as the equivalent REST call.
-- The MCP server is free to connect. Five tools start billable work — `create_job`, `create_video_from_url`, `generate_captions`, `generate_insights` and `generate_highlights` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing.
+- The MCP server is free to connect. Five tools start billable work — `create_job`, `create_video_from_url`, `generate_captions`, `generate_insights` and `generate_highlights` — charged at [the ordinary Transcodely rates](https://www.transcodely.com/pricing). Every other tool is free to call, including the ones that write: saving a preset or setting a spend limit costs nothing. `create_video_from_url` deletes the original source file 7 days after the video is ready unless you pass `retain_source`; a retained source is billed as storage and appears on the invoice as "Retained source videos".
 
 ## Try it
 

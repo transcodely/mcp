@@ -1060,6 +1060,10 @@
             "description": "Preset (id like pst_xxx or slug) driving the transcode. Omit to use the app's default adaptive ladder.",
             "type": "string"
           },
+          "retain_source": {
+            "description": "Keep the original source file instead of deleting it when the app's retention window ends (7 days after ready by default). A retained source is billed as storage at EUR 0.020 per GB-month and appears on the invoice as Retained source videos.",
+            "type": "boolean"
+          },
           "tags": {
             "description": "Freeform tags to attach to the video.",
             "items": {
@@ -1272,6 +1276,24 @@
               "array"
             ]
           },
+          "source_deleted_at": {
+            "description": "When the original source file was deleted. Re-processing then needs a progressive rendition or a fresh upload.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_expires_at": {
+            "description": "When the original source file will be deleted (renditions and playback are unaffected). Absent when the source is retained, already deleted, or not stored.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_pinned": {
+            "description": "True when the original source file is retained past the app's retention window. Retained sources are billed as storage (Retained source videos on the invoice).",
+            "type": "boolean"
+          },
           "status": {
             "type": "string"
           },
@@ -1300,7 +1322,8 @@
           "status",
           "visibility",
           "renditions",
-          "created_at"
+          "created_at",
+          "source_pinned"
         ],
         "type": "object"
       }
@@ -2412,10 +2435,20 @@
           "hosting_estimated_from": {
             "type": "string"
           },
+          "retained_source_cost": {
+            "description": "Cost of retained original source files so far (invoice line Retained source videos), at the storage rate.",
+            "type": "number"
+          },
+          "retained_source_gb_avg": {
+            "description": "Average GB of retained (pinned) original source files. Sources inside their retention window are free and not counted.",
+            "type": "number"
+          },
           "storage_cost": {
+            "description": "Cost of deliverables storage so far (invoice line Hosting — storage).",
             "type": "number"
           },
           "storage_gb_avg": {
+            "description": "Average stored GB of deliverables (renditions, manifests, posters). Excludes original source files.",
             "type": "number"
           },
           "total_cost": {
@@ -2443,6 +2476,8 @@
           "encoding_cost",
           "storage_gb_avg",
           "storage_cost",
+          "retained_source_gb_avg",
+          "retained_source_cost",
           "videos_hosted",
           "egress_gb",
           "egress_cost",
@@ -2660,6 +2695,24 @@
               "array"
             ]
           },
+          "source_deleted_at": {
+            "description": "When the original source file was deleted. Re-processing then needs a progressive rendition or a fresh upload.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_expires_at": {
+            "description": "When the original source file will be deleted (renditions and playback are unaffected). Absent when the source is retained, already deleted, or not stored.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_pinned": {
+            "description": "True when the original source file is retained past the app's retention window. Retained sources are billed as storage (Retained source videos on the invoice).",
+            "type": "boolean"
+          },
           "status": {
             "type": "string"
           },
@@ -2688,7 +2741,8 @@
           "status",
           "visibility",
           "renditions",
-          "created_at"
+          "created_at",
+          "source_pinned"
         ],
         "type": "object"
       }

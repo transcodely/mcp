@@ -4,9 +4,11 @@
     "`command` run in a checkout of `repository` at `ref`. scripts/check-api-parity.mjs",
     "re-runs it and refuses any difference.",
     "",
-    "v5.31.0 exports the twenty-tool surface: generate_highlights (new, billable:",
-    "clipped minutes at the encoding rate, no processing fee), get_video's highlights,",
-    "and the reserved transcodely_ metadata prefix on create_job.",
+    "v5.33.0 exports the twenty-tool surface with source retention: create_video_from_url",
+    "gains retain_source (billed as Retained source videos); get_video and",
+    "create_video_from_url results gain source_pinned / source_expires_at /",
+    "source_deleted_at; get_usage gains retained_source_gb_avg / retained_source_cost.",
+    "Exported from api feat/source-retention-billing @ 81f9ff80 before the tag.",
     "",
     "Re-vendoring must read a DETACHED WORKTREE at that tag, never the shared api",
     "checkout, which other sessions commit to and which sits on master:",
@@ -16,6 +18,6 @@
     "itself — the only mode that verifies the pin."
   ],
   "repository": "https://github.com/transcodely/api.git",
-  "ref": "v5.31.0",
+  "ref": "v5.33.0",
   "command": "go run ./cmd/mcp --dump-tools"
 }
